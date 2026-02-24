@@ -1,0 +1,764 @@
+[INFO] Login performed
+[INFO] Login performed
+[INFO] Login performed
+[INFO] Login performed
+Failed to write log to DB: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+Failed to write log to DB: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+Failed to write log to DB: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:     127.0.0.1:61208 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:61209 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61210 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61211 - "GET / HTTP/1.1" 200 OK
+Failed to write log to DB: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:     127.0.0.1:61468 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:61469 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61497 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:61514 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:61515 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61516 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61517 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61518 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54875 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54876 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54877 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54878 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54879 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52636 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52637 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52638 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52639 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52640 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53943 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53955 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53956 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64383 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:64384 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64385 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64386 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64387 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64390 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:64391 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59950 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59951 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60417 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:60418 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60419 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60420 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60421 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60423 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63833 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63834 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63835 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63836 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63837 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63865 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63866 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63868 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63869 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63870 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63872 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63875 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63876 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63878 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63879 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63880 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63881 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63882 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63887 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63888 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63893 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63894 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63896 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63897 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63898 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63899 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63900 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63956 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63962 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63963 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63964 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63965 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63966 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64009 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:64010 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64011 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64012 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64013 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64426 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64449 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:64451 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64453 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64454 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64456 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64482 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:64483 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51393 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51395 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51429 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51430 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51439 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51440 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51442 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51453 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51454 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51458 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51463 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51464 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51465 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51467 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51471 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49671 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:49672 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49673 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49675 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49676 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49805 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:49806 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49807 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49808 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49810 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49833 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49837 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:49838 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49840 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:49841 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49842 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49843 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49844 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50499 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:50501 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50517 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:50518 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50531 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:50532 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50533 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50534 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50535 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50577 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:50581 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:50582 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50583 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50584 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50585 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50604 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:50605 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50606 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50607 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50608 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62661 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62663 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62664 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62665 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62666 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62667 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62693 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62694 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62716 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62717 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62719 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62720 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62721 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62722 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62723 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62725 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62726 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62729 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62730 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62731 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62732 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62733 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62734 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62759 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62760 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62761 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62762 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62763 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62786 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62787 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62788 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62789 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62790 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62812 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62847 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62848 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62850 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62851 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62852 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62853 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62854 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62876 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62877 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62903 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62904 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62906 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62907 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62908 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62909 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62910 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62912 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62517 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62521 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62522 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62524 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62527 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62537 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62538 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62539 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62540 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62541 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62570 - "GET / HTTP/1.1" 200 OK
+[INFO] Login performed
+
+[INFO] Login performed
+[INFO] Login performed
+Failed to write log to DB: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+Failed to write log to DB: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+Failed to write log to DB: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+Failed to write log to DB: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:     127.0.0.1:56116 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:50480 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50481 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50482 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50483 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53570 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:50485 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50509 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:50513 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:50514 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50515 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50517 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50518 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54205 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54206 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54207 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54208 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54209 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53896 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53898 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53899 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53900 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53901 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53902 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58764 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:58765 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58770 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:58771 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58773 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:58774 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58775 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58776 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58777 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63576 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63577 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55880 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55881 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55882 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55883 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55884 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55885 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51390 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51391 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51392 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51393 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51394 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51139 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51140 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51141 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51142 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51143 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51145 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51148 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51149 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51152 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51153 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51154 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51155 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51156 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51161 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51162 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51167 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51168 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51175 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51176 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51177 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51178 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51179 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51181 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51188 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51189 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51190 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51191 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51192 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57293 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57294 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57295 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57296 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57297 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50806 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53575 - "GET /workers HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53576 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53577 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53578 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53579 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53587 - "POST /workers/heartbeat HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53588 - "GET / HTTP/1.1" 200 OK
+[INFO] Login performed
+[INFO] Login performed
+[INFO] Login performed
+[INFO] Login performed
+INFO:     127.0.0.1:62797 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51908 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54047 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54048 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54050 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54051 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61235 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61236 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61237 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61238 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62816 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62817 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62818 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62819 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56741 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58234 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58235 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58236 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58239 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58241 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57206 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57208 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57209 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57210 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57212 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57348 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65301 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65302 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65303 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65304 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55564 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55565 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55566 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55567 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62668 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62669 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62670 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62671 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62685 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62689 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62690 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62691 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62692 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62694 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62697 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62699 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62700 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62701 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62702 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62704 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63299 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63300 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63301 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63302 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64765 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64766 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64767 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64768 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60272 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60273 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60274 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60277 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60279 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54692 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54695 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54696 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54697 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54699 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64675 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64677 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64678 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64679 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64680 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64684 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64688 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64689 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64690 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64691 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64694 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64695 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64696 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64697 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52412 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52413 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52414 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52415 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50791 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50793 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50794 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50795 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50796 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50798 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62261 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62263 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62264 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62265 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62266 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62224 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62227 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62228 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62229 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62230 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65136 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65137 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65138 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65139 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65142 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65143 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65144 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65145 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65148 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65150 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65151 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65152 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65153 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49571 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49578 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49579 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49580 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49582 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49584 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49591 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65308 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65309 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65310 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65311 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50694 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50695 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50696 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50697 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56728 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56729 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56730 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56731 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56023 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56024 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56025 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56026 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56028 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62871 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62873 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62874 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62875 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62876 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62878 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62881 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62882 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62883 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62884 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62886 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62280 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62281 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62282 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62283 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62286 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62287 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62288 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62289 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55670 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55671 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55672 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55673 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55675 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58569 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58570 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58571 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58572 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58574 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58577 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63759 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63760 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63761 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63762 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63764 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58846 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58847 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58848 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58849 - "GET / HTTP/1.1" 200 OK
+>>> Received Job 2423 for Carteirinha 0064.4193.000001.10-2
+[INFO] Processing carteirinha: 0064.4193.000001.10-2
+[INFO] Sorting table by date (Clicking header twice)...
+[WARNING] Sort header not found. Proceeding without explicit sort.
+[INFO] Starting scraping loop...
+[INFO] Clicked 'new_exame'
+INFO:     127.0.0.1:61337 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61338 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61339 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61340 - "GET / HTTP/1.1" 200 OK
+[INFO] Switched to popup window
+[INFO] Filling form...
+[INFO] Waiting for Results Table...
+INFO:     127.0.0.1:61343 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61344 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61345 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61346 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61348 - "GET / HTTP/1.1" 200 OK
+[INFO] Sorting table by date (Clicking header twice)...
+INFO:     127.0.0.1:61422 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61424 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61425 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61426 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61427 - "GET / HTTP/1.1" 200 OK
+[INFO] Clicked header once. Waiting 4s...
+INFO:     127.0.0.1:54851 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52418 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52419 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52420 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52421 - "GET / HTTP/1.1" 200 OK
+[INFO] Clicked header twice. Waiting 2s...
+INFO:     127.0.0.1:52426 - "GET / HTTP/1.1" 200 OK
+[INFO] Starting scraping loop...
+[INFO] Found 12 rows on page.
+INFO:     127.0.0.1:58656 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58657 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58658 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58659 - "GET / HTTP/1.1" 200 OK
+[INFO] Scraped Guia 69082035
+INFO:     127.0.0.1:64732 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64733 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64734 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64735 - "GET / HTTP/1.1" 200 OK
+[INFO] Scraped Guia 62891922
+[INFO] Guia date 18/11/2024 is older than limit. Stopping.
+INFO:     127.0.0.1:56373 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56374 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56375 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56376 - "GET / HTTP/1.1" 200 OK
+>>> Returning 2 items for Job 2423
+INFO:     127.0.0.1:64233 - "POST /process_job HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56378 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56382 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56384 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56385 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56386 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56387 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53711 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53716 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53717 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53718 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53719 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53721 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53726 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53727 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53728 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53729 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53732 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53733 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53734 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53735 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60208 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60209 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60210 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60211 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60214 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60217 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60219 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60220 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60221 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60222 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64218 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64221 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61402 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61403 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61404 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61405 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61410 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61411 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61412 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61413 - "GET / HTTP/1.1" 200 OK
+>>> Received Job 2424 for Carteirinha 0064.4193.000001.10-2
+[INFO] Processing carteirinha: 0064.4193.000001.10-2
+[INFO] Sorting table by date (Clicking header twice)...
+[WARNING] Sort header not found. Proceeding without explicit sort.
+[INFO] Starting scraping loop...
+[INFO] Clicked 'new_exame'
+INFO:     127.0.0.1:54300 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54301 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54302 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54303 - "GET / HTTP/1.1" 200 OK
+[INFO] Switched to popup window
+[INFO] Filling form...
+[INFO] Waiting for Results Table...
+INFO:     127.0.0.1:54306 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54307 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54308 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54309 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54311 - "GET / HTTP/1.1" 200 OK
+[INFO] Sorting table by date (Clicking header twice)...
+[INFO] Clicked header once. Waiting 4s...
+INFO:     127.0.0.1:54322 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54337 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54339 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54340 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54341 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54344 - "GET / HTTP/1.1" 200 OK
+[INFO] Clicked header twice. Waiting 2s...
+INFO:     127.0.0.1:54347 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54349 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54350 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54351 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54352 - "GET / HTTP/1.1" 200 OK
+[INFO] Starting scraping loop...
+[INFO] Found 12 rows on page.
+INFO:     127.0.0.1:54355 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54356 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54357 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54358 - "GET / HTTP/1.1" 200 OK
+[INFO] Scraped Guia 69082035
+INFO:     127.0.0.1:54369 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54370 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54371 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54372 - "GET / HTTP/1.1" 200 OK
+[INFO] Scraped Guia 62891922
+[INFO] Guia date 18/11/2024 is older than limit. Stopping.
+>>> Returning 2 items for Job 2424
+INFO:     127.0.0.1:61420 - "POST /process_job HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54377 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54378 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54379 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54380 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54382 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54386 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54388 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54389 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54390 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54391 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54393 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54402 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54403 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54404 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54405 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54407 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54413 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54414 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54415 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54416 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54423 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54424 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54425 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54426 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54430 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54431 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54432 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54433 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54435 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54439 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54440 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54441 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54442 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54444 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54447 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54449 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54450 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54451 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54452 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54454 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54457 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54458 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54459 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54460 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54464 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54465 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54466 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54467 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54476 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54477 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54478 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54481 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54483 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54484 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54485 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54486 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54488 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54518 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54527 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54528 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54531 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54532 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54540 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54544 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54545 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54546 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54547 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54551 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54552 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54553 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54554 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54570 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54571 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54572 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54573 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54578 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54580 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54581 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54583 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54584 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54588 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54598 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54599 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54600 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54601 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54604 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54607 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54609 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54610 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54611 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54612 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54623 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54624 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54625 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54626 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54631 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54632 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54633 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54634 - "GET / HTTP/1.1" 200 OK

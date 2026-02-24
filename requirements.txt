@@ -1,0 +1,23 @@
+# Backend
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+pydantic
+pydantic-settings
+python-multipart
+python-dotenv
+requests
+
+# Worker / Data Processing
+selenium
+openpyxl
+xlsxwriter
+supabase
+gotrue
+
+# System / GUI
+psutil
+pystray
+Pillow
+winotify

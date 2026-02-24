@@ -1,0 +1,394 @@
+INFO:     Started server process [80744]
+INFO:     Waiting for application startup.
+INFO:     Started server process [67892]
+INFO:     Waiting for application startup.
+INFO:     Started server process [76716]
+INFO:     Waiting for application startup.
+INFO:     Started server process [23632]
+INFO:     Waiting for application startup.
+2026-02-15 23:20:43,871 - INFO - Starting Dispatcher...
+2026-02-15 23:20:47,947 - ERROR - Error resetting failed jobs: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:20:51,997 - ERROR - Error fetching pending job: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:20:51,998 - INFO - No pending jobs.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8002 (Press CTRL+C to quit)
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8003 (Press CTRL+C to quit)
+2026-02-15 23:21:11,046 - ERROR - Error resetting failed jobs: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:21:15,075 - ERROR - Error fetching pending job: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:21:15,075 - INFO - No pending jobs.
+2026-02-15 23:21:34,104 - ERROR - Error resetting failed jobs: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:21:38,171 - ERROR - Error fetching pending job: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:21:38,171 - INFO - No pending jobs.
+2026-02-15 23:21:57,209 - ERROR - Error resetting failed jobs: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:22:01,262 - ERROR - Error fetching pending job: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:22:01,263 - INFO - No pending jobs.
+2026-02-15 23:22:20,310 - ERROR - Error resetting failed jobs: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:22:24,351 - ERROR - Error fetching pending job: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:22:24,355 - INFO - No pending jobs.
+2026-02-15 23:22:43,400 - ERROR - Error resetting failed jobs: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:22:47,441 - ERROR - Error fetching pending job: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:22:47,442 - INFO - No pending jobs.
+2026-02-15 23:23:06,497 - ERROR - Error resetting failed jobs: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:23:10,543 - ERROR - Error fetching pending job: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:23:10,544 - INFO - No pending jobs.
+2026-02-15 23:23:29,601 - ERROR - Error resetting failed jobs: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:23:33,657 - ERROR - Error fetching pending job: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:23:33,657 - INFO - No pending jobs.
+2026-02-15 23:23:52,706 - ERROR - Error resetting failed jobs: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:23:56,744 - ERROR - Error fetching pending job: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:23:56,745 - INFO - No pending jobs.
+2026-02-15 23:24:15,782 - ERROR - Error resetting failed jobs: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:24:19,825 - ERROR - Error fetching pending job: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:24:19,825 - INFO - No pending jobs.
+2026-02-15 23:24:38,859 - ERROR - Error resetting failed jobs: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:24:42,905 - ERROR - Error fetching pending job: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:24:42,906 - INFO - No pending jobs.
+2026-02-15 23:25:01,945 - ERROR - Error resetting failed jobs: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:25:05,992 - ERROR - Error fetching pending job: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:25:05,993 - INFO - No pending jobs.
+INFO:     Started server process [62772]
+INFO:     Waiting for application startup.
+INFO:     Started server process [82348]
+INFO:     Waiting for application startup.
+INFO:     Started server process [1764]
+INFO:     Waiting for application startup.
+INFO:     Started server process [76152]
+INFO:     Waiting for application startup.
+2026-02-15 23:28:50,026 - INFO - Starting Dispatcher...
+2026-02-15 23:28:54,114 - ERROR - Error resetting failed jobs: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:28:58,178 - ERROR - Error fetching pending job: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:28:58,179 - INFO - No pending jobs.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8002 (Press CTRL+C to quit)
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8003 (Press CTRL+C to quit)
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+2026-02-15 23:29:17,247 - ERROR - Error resetting failed jobs: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:29:21,291 - ERROR - Error fetching pending job: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:29:21,292 - INFO - No pending jobs.
+2026-02-15 23:29:40,346 - ERROR - Error resetting failed jobs: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:29:44,400 - ERROR - Error fetching pending job: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:29:44,401 - INFO - No pending jobs.
+2026-02-15 23:30:03,467 - ERROR - Error resetting failed jobs: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:30:07,502 - ERROR - Error fetching pending job: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:30:07,502 - INFO - No pending jobs.
+2026-02-15 23:30:26,551 - ERROR - Error resetting failed jobs: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:30:30,598 - ERROR - Error fetching pending job: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:30:30,599 - INFO - No pending jobs.
+2026-02-15 23:30:49,647 - ERROR - Error resetting failed jobs: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:30:53,701 - ERROR - Error fetching pending job: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:30:53,702 - INFO - No pending jobs.
+2026-02-15 23:31:12,755 - ERROR - Error resetting failed jobs: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:31:16,797 - ERROR - Error fetching pending job: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:31:16,798 - INFO - No pending jobs.
+2026-02-15 23:31:35,841 - ERROR - Error resetting failed jobs: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:31:39,899 - ERROR - Error fetching pending job: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-15 23:31:39,900 - INFO - No pending jobs.
+INFO:     Started server process [76456]
+INFO:     Waiting for application startup.
+INFO:     Started server process [76464]
+INFO:     Waiting for application startup.
+INFO:     Waiting for application startup.
+INFO:     Started server process [82864]
+INFO:     Waiting for application startup.
+2026-02-15 23:38:29,790 - INFO - Starting Dispatcher...
+2026-02-15 23:38:30,262 - INFO - Retrying 1 failed jobs...
+2026-02-15 23:38:30,359 - INFO - Assigning Job 2423 to http://127.0.0.1:8000
+2026-02-15 23:38:32,725 - ERROR - Error calling server http://127.0.0.1:8000: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /process_job (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"))
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8003 (Press CTRL+C to quit)
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8002 (Press CTRL+C to quit)
+2026-02-15 23:38:45,493 - INFO - No pending jobs.
+2026-02-15 23:39:00,574 - INFO - No pending jobs.
+2026-02-15 23:39:15,649 - INFO - No pending jobs.
+2026-02-15 23:39:30,724 - INFO - No pending jobs.
+2026-02-15 23:39:45,794 - INFO - No pending jobs.
+2026-02-15 23:40:00,875 - INFO - No pending jobs.
+2026-02-15 23:40:15,945 - INFO - No pending jobs.
+2026-02-15 23:40:31,026 - INFO - No pending jobs.
+2026-02-15 23:40:46,098 - INFO - No pending jobs.
+2026-02-15 23:41:01,177 - INFO - Assigning Job 2423 to http://127.0.0.1:8000
+2026-02-15 23:41:16,285 - INFO - No pending jobs.
+2026-02-15 23:41:26,891 - INFO - Processing 2 items from worker response.
+2026-02-15 23:41:26,892 - INFO - Processing item: {'numero_guia': '69082035', 'data_autorizacao': '26/01/2026 ', 'senha': '955756369 ', 'validade_senha': '23/09/2026', 'codigo_terapia': '2250005103', 'qtde_solicitada': '32', 'qtde_autorizada': '26', 'status': 'Autorizado'}
+2026-02-15 23:41:26,897 - INFO - Parsed values - Guia: 69082035, DatAuth: 2026-01-26, Val: 2026-09-23, QtdSol: 32, QtdAut: 26
+2026-02-15 23:41:26,898 - INFO - Checking if guia exists in DB...
+2026-02-15 23:41:26,927 - INFO - DB Query result: <models.BaseGuia object at 0x000001CD8B614AD0>
+2026-02-15 23:41:26,928 - INFO - Updating existing guia...
+2026-02-15 23:41:26,928 - INFO - Processing item: {'numero_guia': '62891922', 'data_autorizacao': '02/06/2025 ', 'senha': '950020751 ', 'validade_senha': '19/11/2027', 'codigo_terapia': '2250005103', 'qtde_solicitada': '32', 'qtde_autorizada': '6', 'status': 'Autorizado'}
+2026-02-15 23:41:26,928 - INFO - Parsed values - Guia: 62891922, DatAuth: 2025-06-02, Val: 2027-11-19, QtdSol: 32, QtdAut: 6
+2026-02-15 23:41:26,929 - INFO - Checking if guia exists in DB...
+2026-02-15 23:41:26,947 - INFO - DB Query result: <models.BaseGuia object at 0x000001CD8B6351D0>
+2026-02-15 23:41:26,948 - INFO - Updating existing guia...
+2026-02-15 23:41:26,948 - INFO - Committing changes to DB...
+2026-02-15 23:41:27,122 - INFO - Commit successful.
+2026-02-15 23:41:31,362 - INFO - No pending jobs.
+2026-02-15 23:41:46,435 - INFO - No pending jobs.
+2026-02-15 23:42:01,507 - INFO - Assigning Job 2424 to http://127.0.0.1:8000
+2026-02-15 23:42:16,622 - INFO - No pending jobs.
+2026-02-15 23:42:26,246 - INFO - Processing 2 items from worker response.
+2026-02-15 23:42:26,247 - INFO - Processing item: {'numero_guia': '69082035', 'data_autorizacao': '26/01/2026 ', 'senha': '955756369 ', 'validade_senha': '23/09/2026', 'codigo_terapia': '2250005103', 'qtde_solicitada': '32', 'qtde_autorizada': '26', 'status': 'Autorizado'}
+2026-02-15 23:42:26,248 - INFO - Parsed values - Guia: 69082035, DatAuth: 2026-01-26, Val: 2026-09-23, QtdSol: 32, QtdAut: 26
+2026-02-15 23:42:26,248 - INFO - Checking if guia exists in DB...
+2026-02-15 23:42:26,271 - INFO - DB Query result: <models.BaseGuia object at 0x000001CD8B553390>
+2026-02-15 23:42:26,272 - INFO - Updating existing guia...
+2026-02-15 23:42:26,272 - INFO - Processing item: {'numero_guia': '62891922', 'data_autorizacao': '02/06/2025 ', 'senha': '950020751 ', 'validade_senha': '19/11/2027', 'codigo_terapia': '2250005103', 'qtde_solicitada': '32', 'qtde_autorizada': '6', 'status': 'Autorizado'}
+2026-02-15 23:42:26,273 - INFO - Parsed values - Guia: 62891922, DatAuth: 2025-06-02, Val: 2027-11-19, QtdSol: 32, QtdAut: 6
+2026-02-15 23:42:26,273 - INFO - Checking if guia exists in DB...
+2026-02-15 23:42:26,291 - INFO - DB Query result: <models.BaseGuia object at 0x000001CD8B65A060>
+2026-02-15 23:42:26,292 - INFO - Updating existing guia...
+2026-02-15 23:42:26,292 - INFO - Committing changes to DB...
+2026-02-15 23:42:26,398 - INFO - Commit successful.
+2026-02-15 23:42:31,695 - INFO - No pending jobs.
+2026-02-15 23:42:46,765 - INFO - No pending jobs.
+2026-02-15 23:43:01,837 - INFO - No pending jobs.
+2026-02-15 23:43:16,907 - INFO - No pending jobs.
+2026-02-15 23:43:31,979 - INFO - No pending jobs.
+2026-02-15 23:43:47,052 - INFO - No pending jobs.
+2026-02-15 23:44:02,124 - INFO - No pending jobs.
+2026-02-15 23:44:17,196 - INFO - No pending jobs.
+2026-02-15 23:44:32,269 - INFO - No pending jobs.
+2026-02-15 23:44:47,340 - INFO - No pending jobs.
+2026-02-15 23:45:02,411 - INFO - No pending jobs.
+2026-02-15 23:45:17,486 - INFO - No pending jobs.
+2026-02-15 23:45:32,562 - INFO - No pending jobs.
+2026-02-15 23:45:47,635 - INFO - No pending jobs.
+2026-02-15 23:46:02,707 - INFO - No pending jobs.
+2026-02-15 23:46:17,776 - INFO - No pending jobs.
+2026-02-15 23:46:32,853 - INFO - No pending jobs.
+2026-02-15 23:46:47,925 - INFO - No pending jobs.
+2026-02-15 23:47:03,001 - INFO - No pending jobs.
+2026-02-15 23:47:18,072 - INFO - No pending jobs.
+2026-02-15 23:47:33,143 - INFO - No pending jobs.
+2026-02-15 23:47:48,216 - INFO - No pending jobs.
+2026-02-15 23:47:55,481 - ERROR - An error occurred when calling message handler
+Traceback (most recent call last):
+  File "pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        uMsg, lambda w, l: 0)(wParam, lParam) or 0)
+        ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "pystray\_base.py", line 328, in inner
+    callback(self)
+    ~~~~~~~~^^^^^^
+  File "pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ~~~~~~~~~~~~^^^^^^^^^^^^
+  File "gui.py", line 885, in quit_app
+SystemExit
