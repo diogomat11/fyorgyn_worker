@@ -1,0 +1,32 @@
+=== Patient 4319 in agendamentos? ===
+ERROR: (psycopg2.errors.UndefinedColumn) column "nome_paciente" does not exist
+LINE 1: SELECT id_agendamento, id_paciente, Nome_Paciente, carteirin...
+                                            ^
+HINT:  Perhaps you meant to reference the column "agendamentos.Nome_Paciente".
+
+[SQL: SELECT id_agendamento, id_paciente, Nome_Paciente, carteirinha FROM agendamentos WHERE id_paciente = 4319 LIMIT 5]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+=== Patient 4545 in agendamentos? ===
+ERROR: (psycopg2.errors.InFailedSqlTransaction) current transaction is aborted, commands ignored until end of transaction block
+
+[SQL: SELECT id_agendamento, id_paciente, Nome_Paciente, carteirinha FROM agendamentos WHERE id_paciente = 4545 LIMIT 5]
+(Background on this error at: https://sqlalche.me/e/20/2j85)
+
+=== Carteirinhas for patients 4319 and 4545 ===
+ERROR: (psycopg2.errors.InFailedSqlTransaction) current transaction is aborted, commands ignored until end of transaction block
+
+[SQL: SELECT id, id_paciente, paciente, carteirinha FROM carteirinhas WHERE id_paciente IN (4319, 4545)]
+(Background on this error at: https://sqlalche.me/e/20/2j85)
+
+=== Searching agendamentos for carteirinha values matching these patients ===
+ERROR: (psycopg2.errors.InFailedSqlTransaction) current transaction is aborted, commands ignored until end of transaction block
+
+[SQL: SELECT carteirinha FROM carteirinhas WHERE id_paciente IN (4319, 4545)]
+(Background on this error at: https://sqlalche.me/e/20/2j85)
+
+=== Sample of the agendamentos that DID get linked (patient 4251) ===
+ERROR: (psycopg2.errors.InFailedSqlTransaction) current transaction is aborted, commands ignored until end of transaction block
+
+[SQL: SELECT id_agendamento, id_paciente, carteirinha, numero_guia, cod_procedimento_aut FROM agendamentos WHERE numero_guia IS NOT NULL LIMIT 5]
+(Background on this error at: https://sqlalche.me/e/20/2j85)

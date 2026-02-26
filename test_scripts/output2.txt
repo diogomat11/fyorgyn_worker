@@ -1,0 +1,130 @@
+== Diagnosticando Base_Guias ==
+Existem 21 guias.
+
+== Procurando Agendamentos Elegiveis por Guia ==
+
+Guia 69237819 (paciente: 4251, convenio: 3, terapia: 50000012, 2026-01-31 a 2026-07-30, saldo: 32)
+  - Agendamentos do mesmo paciente: 3
+  - Mesmo paciente + convenio: 3
+  - Mesmo pac + conv + terapia: 2
+  - Mesmo pac + conv + terapia + na data: 2
+
+Guia 69237820 (paciente: 4251, convenio: 3, terapia: 50001213, 2026-01-31 a 2026-04-01, saldo: 32)
+  - Agendamentos do mesmo paciente: 3
+  - Mesmo paciente + convenio: 3
+  - Mesmo pac + conv + terapia: 0
+  - Mesmo pac + conv + terapia + na data: 0
+
+Guia 69237817 (paciente: 4251, convenio: 3, terapia: 2250005170, 2026-01-31 a 2027-01-26, saldo: 32)
+  - Agendamentos do mesmo paciente: 3
+  - Mesmo paciente + convenio: 3
+  - Mesmo pac + conv + terapia: 1
+  - Mesmo pac + conv + terapia + na data: 1
+
+Guia 69237821 (paciente: 4251, convenio: 3, terapia: 2250005278, 2026-01-31 a 2027-03-27, saldo: 48)
+  - Agendamentos do mesmo paciente: 3
+  - Mesmo paciente + convenio: 3
+  - Mesmo pac + conv + terapia: 0
+  - Mesmo pac + conv + terapia + na data: 0
+
+Guia 69237822 (paciente: 4251, convenio: 3, terapia: 2250005103, 2026-01-31 a 2027-03-27, saldo: 64)
+  - Agendamentos do mesmo paciente: 3
+  - Mesmo paciente + convenio: 3
+  - Mesmo pac + conv + terapia: 0
+  - Mesmo pac + conv + terapia + na data: 0
+
+Guia 69237823 (paciente: 4251, convenio: 3, terapia: 2250005189, 2026-01-31 a 2026-07-30, saldo: 32)
+  - Agendamentos do mesmo paciente: 3
+  - Mesmo paciente + convenio: 3
+  - Mesmo pac + conv + terapia: 0
+  - Mesmo pac + conv + terapia + na data: 0
+
+Guia 67575934 (paciente: 4251, convenio: 3, terapia: 2250005170, 2025-11-24 a 2027-03-19, saldo: 32)
+  - Agendamentos do mesmo paciente: 3
+  - Mesmo paciente + convenio: 3
+  - Mesmo pac + conv + terapia: 1
+  - Mesmo pac + conv + terapia + na data: 1
+
+Guia 67575937 (paciente: 4251, convenio: 3, terapia: 2250005278, 2025-11-24 a 2027-03-19, saldo: 16)
+  - Agendamentos do mesmo paciente: 3
+  - Mesmo paciente + convenio: 3
+  - Mesmo pac + conv + terapia: 0
+  - Mesmo pac + conv + terapia + na data: 0
+
+Guia 67575939 (paciente: 4251, convenio: 3, terapia: 2250005189, 2025-11-24 a 2027-11-14, saldo: 32)
+  - Agendamentos do mesmo paciente: 3
+  - Mesmo paciente + convenio: 3
+  - Mesmo pac + conv + terapia: 0
+  - Mesmo pac + conv + terapia + na data: 0
+
+Guia 67575935 (paciente: 4251, convenio: 3, terapia: 50000012, 2025-11-24 a 2027-05-18, saldo: 32)
+  - Agendamentos do mesmo paciente: 3
+  - Mesmo paciente + convenio: 3
+  - Mesmo pac + conv + terapia: 2
+  - Mesmo pac + conv + terapia + na data: 2
+
+Guia 67575936 (paciente: 4251, convenio: 3, terapia: 50001213, 2025-11-24 a 2027-11-14, saldo: 32)
+  - Agendamentos do mesmo paciente: 3
+  - Mesmo paciente + convenio: 3
+  - Mesmo pac + conv + terapia: 0
+  - Mesmo pac + conv + terapia + na data: 0
+
+Guia 67575938 (paciente: 4251, convenio: 3, terapia: 2250005103, 2025-11-24 a 2027-01-18, saldo: 64)
+  - Agendamentos do mesmo paciente: 3
+  - Mesmo paciente + convenio: 3
+  - Mesmo pac + conv + terapia: 0
+  - Mesmo pac + conv + terapia + na data: 0
+
+Guia 65707635 (paciente: 4251, convenio: 3, terapia: 2250005170, 2025-09-17 a 2027-03-11, saldo: 32)
+  - Agendamentos do mesmo paciente: 3
+  - Mesmo paciente + convenio: 3
+  - Mesmo pac + conv + terapia: 1
+  - Mesmo pac + conv + terapia + na data: 1
+
+Guia 65707636 (paciente: 4251, convenio: 3, terapia: 50000012, 2025-09-17 a 2027-03-11, saldo: 32)
+  - Agendamentos do mesmo paciente: 3
+  - Mesmo paciente + convenio: 3
+  - Mesmo pac + conv + terapia: 2
+  - Mesmo pac + conv + terapia + na data: 2
+
+Guia 65707640 (paciente: 4251, convenio: 3, terapia: 2250005189, 2025-09-17 a 2026-07-14, saldo: 32)
+  - Agendamentos do mesmo paciente: 3
+  - Mesmo paciente + convenio: 3
+  - Mesmo pac + conv + terapia: 0
+  - Mesmo pac + conv + terapia + na data: 0
+
+Guia 65707639 (paciente: 4251, convenio: 3, terapia: 2250005103, 2025-09-17 a 2030-04-24, saldo: 64)
+  - Agendamentos do mesmo paciente: 3
+  - Mesmo paciente + convenio: 3
+  - Mesmo pac + conv + terapia: 0
+  - Mesmo pac + conv + terapia + na data: 0
+
+Guia 65707637 (paciente: 4251, convenio: 3, terapia: 50001213, 2025-09-17 a 2027-11-06, saldo: 32)
+  - Agendamentos do mesmo paciente: 3
+  - Mesmo paciente + convenio: 3
+  - Mesmo pac + conv + terapia: 0
+  - Mesmo pac + conv + terapia + na data: 0
+
+Guia 65429597 (paciente: 4319, convenio: 3, terapia: 2250005278, 2025-09-08 a 2027-05-01, saldo: 32)
+  - Agendamentos do mesmo paciente: 0
+  - Mesmo paciente + convenio: 0
+  - Mesmo pac + conv + terapia: 0
+  - Mesmo pac + conv + terapia + na data: 0
+
+Guia 15487733 (paciente: 4545, convenio: 2, terapia: 2250005170, 2025-11-10 a 2026-01-09, saldo: 10)
+  - Agendamentos do mesmo paciente: 0
+  - Mesmo paciente + convenio: 0
+  - Mesmo pac + conv + terapia: 0
+  - Mesmo pac + conv + terapia + na data: 0
+
+Guia 15255084 (paciente: 4545, convenio: 2, terapia: 2250005278, 2025-09-15 a 2025-11-14, saldo: 10)
+  - Agendamentos do mesmo paciente: 0
+  - Mesmo paciente + convenio: 0
+  - Mesmo pac + conv + terapia: 0
+  - Mesmo pac + conv + terapia + na data: 0
+
+Guia 15768676 (paciente: 4545, convenio: 2, terapia: 2250005170, 2026-02-02 a 2026-04-03, saldo: 6)
+  - Agendamentos do mesmo paciente: 0
+  - Mesmo paciente + convenio: 0
+  - Mesmo pac + conv + terapia: 0
+  - Mesmo pac + conv + terapia + na data: 0

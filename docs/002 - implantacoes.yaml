@@ -1,0 +1,214 @@
+project:
+  name: Orquestração de Jobs e Rotinas de Captura/Execução
+  objetivo: >
+    Definir regras funcionais, dependências de jobs, comportamentos de frontend,
+    rotinas de captura e execução, bem como ajustes estruturais em banco de dados
+    e lógica de dispatcher, garantindo consistência operacional entre convênios.
+
+padroes_gerais:
+  - seguir padroes do projeto
+  - Jobs podem possuir dependência explícita
+  - Jobs dependentes só podem ser despachados após sucesso do job de origem
+  - Status devem ser persistidos e auditáveis
+  - Timeout deve ser respeitado rigorosamente
+  - Nenhuma rotina pode gerar duplicidade de captura ou execução
+
+entregas_obrigatorias:
+  - Ajustes em tabelas conforme especificação
+  - Implementação de dependência entre jobs
+  - Regras de frontend por convênio
+  - Rotina de captura
+  - Rotina de execução
+  - Regras de timeout e exclusão de guias do sistema do convenio, não no banco de dados
+  - Atualização de status em agendamentos
+
+banco_de_dados:
+  tabelas:
+    base_guias:
+      novas_colunas:
+        timestamp_captura:
+          tipo: datetime
+          formato: "dd/mm/aaaa hh:mm"
+          regras:
+            - timeout: captura + 59 minutos
+            - após timeout: valor deve ser apagado automaticamente
+
+    jobs:
+      novas_colunas:
+        depending:
+          descricao: >
+            Identifica se o job depende da execução bem-sucedida de outro job vinculando id job
+          regras:
+            - Job dependente só pode ser atribuído ao servidor após sucesso do job pai
+            - Ao sucesso de um job, jobs dependentes devem ser sinalizados
+
+    agendamento:
+      novas_colunas:
+        execucao_status:
+          valores_permitidos:
+            - pendente
+            - erro
+            - sucesso
+
+    convenio:
+      novas_colunas:
+        biometria:
+          valores: [sim, nao]
+        timeout_captura:
+          valores: [sim, nao]
+        pei_automatico:
+          valores: [sim, nao]
+
+frontend:
+  botoes:
+    confirmar:
+      comportamento:
+        unimed_goiania:
+          exibir_mensagem_confirmacao: true
+          opcoes:
+            sim:
+              acoes:
+                - confirmar_agendamento
+                - criar_job_rotina_captura
+                - criar_job_execucao_dependente_do_job_captura
+            nao:
+              acoes:
+                - confirmar_agendamento
+        demais_convenios:
+          acoes:
+            - confirmar_agendamento
+            - criar_job_rotina_captura
+            - criar_job_execucao_dependente_do_job_captura
+
+    capturar:
+      visibilidade:
+        permitido:
+          - unimed_goiania
+          - unimed_anapolis
+        bloqueado:
+          - demais_convenios
+      regras:
+        - Ao clicar:
+            - criar job de captura
+            - criar job de execução dependente do job de captura
+        - Job de captura:
+            - deve ser único por guia
+        - Job de execução:
+            - deve ser criado um para cada agendamento vinculado à guia
+        - Bloqueios:
+            - Se agendamento.execucao_status == sucesso:
+                bloquear botão faturar
+            - Se job captura estiver com status sucesso:
+                bloquear botão capturar
+
+    faturar:
+      unimed_goiania:
+        regras:
+          - verificar existência de job captura com timestamp_captura dentro do timeout
+          sim:
+            - criar job execução dependente do job captura
+          não:
+           - exibir status de error (Guia não captura)
+      unimed_anapolis:
+        regras:
+          - criar job captura
+          - criar job execução dependente do job captura
+
+jobs:
+  regras_gerais:
+    - Job de execução depende obrigatoriamente de job de captura(unimed_anapolis e unimed_goiania)
+    - Ao sucesso de job execução:
+        - Atualizar agendamento.execucao_status = sucesso
+
+rotina_2_captura:
+  convenios:
+    - unimed_goiania
+    - unimed_anapolis
+
+  passos:
+    - verificar_existencia_guia:
+        origem: tabela_base_guias(tela inicia após login)
+        destino: sistema_sgucard
+        parametros:
+          input_guia:
+            name: "s_nr_guia"
+          botao_filtrar:
+            name: "Button_FIltro"
+
+    - executar_filtro:
+        acoes:
+          - limpar_input
+          - enviar_numero_guia
+          - clicar_filtrar
+          - aguardar_carregamento
+
+    - verificar_resultado:
+        identificador_guia:
+          xpath: //*[@id="trRow_2"]/td[3]/a
+
+        se_localizada:
+          capturar_horario:
+            xpath: //*[@id="trRow_2"]/td[2]
+            tratamento:
+              - remover_espacos_inicio_fim
+              - formatar_dd_mm_aaaa_hh_mm
+
+          validacoes:
+            - se_convenio_possui_timeout:
+                condicao: (horario_captura + 59min) < (now + 2min)
+                acoes:
+                  - excluir_guia_sistema_unimed
+                  - continuar_rotina_captura
+            - senao:
+                acoes:
+                  - salvar_timestamp_captura_na_tabela_guias
+                  - encerrar_rotina_com_sucesso
+
+        se_nao_localizada:
+          regras:
+            - Se captura já foi sucesso:
+                - repetir rotina apenas mais uma vez
+                - se ainda não localizar:
+                    - exibir erro "Guia não capturada ou inexistente"
+            - Se não houve captura anterior:
+                - registrar erro guia inexistente
+
+configuracoes_especiais:
+   seed novas colunas na tabela convenios:
+    regra:
+      - Apenas unimed_goiania possui timeout de timestamp_captura
+      - Apenas unimed_goiania possui biometria
+      - Apenas unimed_goiania possui pei_automatico
+    aplicacao:
+      - via script de seed
+      - nao utilizar migration
+
+dependencia_jobs(unimed_anapolis e unimed_goiania:
+  regras:
+    - Ao criar job de execução:
+        verificar:
+          - existência de job captura (pendente, processando ou sucesso)
+    - Se job captura:
+        status: sucesso
+        condicao:
+          - (timestamp_captura + 59min) < (now + 2min) - quando aplicavel ao convenio
+    - Job execução:
+        - deve referenciar job captura como dependente
+        - só pode ser despachado se:
+            - job dependente com status sucesso
+            - timestamp dentro do timeout  - quando aplicavel ao convenio
+
+rotina_3_execucao:
+  convenio:
+    - unimed_goiania
+
+  pre_requisitos:
+    - existência de timestamp_captura
+    - timestamp < (horario_atual - 2min)
+
+  regras:
+    - Se timestamp faltar menos de 2 minutos para completar 59min:
+        acoes:
+          - excluir_guia
+          - criar_novo_job_captura
+          - manter job execução como pendente, vinculado ao job captura

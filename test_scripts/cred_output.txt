@@ -1,0 +1,11 @@
+﻿DB: postgresql://postgres.ourddwze...
+User: 70205235107
+Encrypting password...
+DEBUG: encrypt_password called for secret of length 11
+DEBUG: get_fernet called
+DEBUG: FERNET_SECRET found, lens: 44
+DEBUG: Created Fernet instance: <cryptography.fernet.Fernet object at 0x000001F329FE3770>
+DEBUG: Encryption done, token length: 100
+Encrypted (len=100)
+[OK] Credentials uploaded for UNIMED ANAPOLIS (id=2)
+  Verify: id=2, nome=UNIMED ANAPOLIS, user=70205235107, has_pwd=True

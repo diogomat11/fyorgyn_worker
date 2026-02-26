@@ -1,0 +1,8 @@
+﻿=== Fixing calculate_patient_pei trigger ===
+  Trigger function updated!
+
+=== Re-triggering PEI for existing guias ===
+  Touched 2 guias
+
+=== Patient PEI after fix ===
+  id=1, cart_id=2, terapia=2250005103, pei=2.0, status=Validado, validade=2026-07-25

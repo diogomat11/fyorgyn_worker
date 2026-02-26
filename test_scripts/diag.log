@@ -1,0 +1,47 @@
+=== BASE_GUIAS carteirinha_id ===
+(3, '69237819', 1)
+(4, '69237820', 1)
+(5, '69237817', 1)
+(6, '69237821', 1)
+(7, '69237822', 1)
+(8, '69237823', 1)
+(9, '67575934', 1)
+(10, '67575937', 1)
+(11, '67575939', 1)
+(12, '67575935', 1)
+(13, '67575936', 1)
+(14, '67575938', 1)
+(15, '65707635', 1)
+(16, '65707636', 1)
+(17, '65707640', 1)
+(18, '65707639', 1)
+(19, '65707637', 1)
+(20, '65429597', 3)
+(22, '15487733', 604)
+(23, '15255084', 604)
+(21, '15768676', 604)
+
+=== Verificando se carteirinha_id existe na tabela carteirinhas ===
+Guia 69237819: carteirinha_id=1 -> id_paciente=4251 OK
+Guia 69237820: carteirinha_id=1 -> id_paciente=4251 OK
+Guia 69237817: carteirinha_id=1 -> id_paciente=4251 OK
+Guia 69237821: carteirinha_id=1 -> id_paciente=4251 OK
+Guia 69237822: carteirinha_id=1 -> id_paciente=4251 OK
+Guia 69237823: carteirinha_id=1 -> id_paciente=4251 OK
+Guia 67575934: carteirinha_id=1 -> id_paciente=4251 OK
+Guia 67575937: carteirinha_id=1 -> id_paciente=4251 OK
+Guia 67575939: carteirinha_id=1 -> id_paciente=4251 OK
+Guia 67575935: carteirinha_id=1 -> id_paciente=4251 OK
+Guia 67575936: carteirinha_id=1 -> id_paciente=4251 OK
+Guia 67575938: carteirinha_id=1 -> id_paciente=4251 OK
+Guia 65707635: carteirinha_id=1 -> id_paciente=4251 OK
+Guia 65707636: carteirinha_id=1 -> id_paciente=4251 OK
+Guia 65707640: carteirinha_id=1 -> id_paciente=4251 OK
+Guia 65707639: carteirinha_id=1 -> id_paciente=4251 OK
+Guia 65707637: carteirinha_id=1 -> id_paciente=4251 OK
+Guia 65429597: carteirinha_id=3 -> id_paciente=4319 OK
+Guia 15487733: carteirinha_id=604 -> id_paciente=4545 OK
+Guia 15255084: carteirinha_id=604 -> id_paciente=4545 OK
+Guia 15768676: carteirinha_id=604 -> id_paciente=4545 OK
+
+=== Amostra de Agendamentos SEM guia ===

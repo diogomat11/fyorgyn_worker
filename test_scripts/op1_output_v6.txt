@@ -1,0 +1,109 @@
+﻿DEBUG: get_fernet called
+DEBUG: FERNET_SECRET found, lens: 44
+DEBUG: Created Fernet instance: <cryptography.fernet.Fernet object at 0x000001E58F175550>
+>>> [Anapolis] Credentials loaded from DB for convenio 2
+
+[START] Op1 Test (Consulta Guias)...
+[INFO] [Anapolis] Login performed
+[INFO] [Anapolis] Attempt 1/3 for routine '1'
+[INFO] [Anapolis] Op1: Processing carteirinha 0064.8000.387928.00-0
+[INFO] [Anapolis] Navigating to Consulta (Anapolis sequence)...
+[INFO] [Anapolis] Clicked MENU_CENTRO_61
+[INFO] [Anapolis] Clicked MENU_ITEM_2
+[INFO] [Anapolis] Clicked SADTs em aberto (#centro_3)
+[INFO] [Anapolis] Looking for 'new_exame'...
+[INFO] [Anapolis] Clicked new_exame
+[INFO] [Anapolis] Switched to popup window
+[WARN] [Anapolis] Timeout attempt 1: Message: 
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x7ff7bc2f4435
+	0x7ff7bc2f4490
+	0x7ff7bc08d49d
+	0x7ff7bc0e82fe
+	0x7ff7bc0e860c
+	0x7ff7bc138b67
+	0x7ff7bc135728
+	0x7ff7bc0d8e38
+	0x7ff7bc0d9d23
+	0x7ff7bc5c3b30
+	0x7ff7bc5be3b8
+	0x7ff7bc5de72a
+	0x7ff7bc3107e5
+	0x7ff7bc31978c
+	0x7ff7bc2fd794
+	0x7ff7bc2fd946
+	0x7ff7bc2e3457
+	0x7ff8b5f4e8d7
+	0x7ff8b7fcc40c
+
+[INFO] [Anapolis] Attempt 2/3 for routine '1'
+[INFO] [Anapolis] Op1: Processing carteirinha 0064.8000.387928.00-0
+[INFO] [Anapolis] Navigating to Consulta (Anapolis sequence)...
+[INFO] [Anapolis] Standard click failed for MENU_CENTRO_61, trying JS...
+[INFO] [Anapolis] JS Clicked MENU_CENTRO_61
+[INFO] [Anapolis] Clicked MENU_ITEM_2
+[INFO] [Anapolis] Clicked SADTs em aberto (#centro_3)
+[INFO] [Anapolis] Looking for 'new_exame'...
+[INFO] [Anapolis] Clicked new_exame
+[INFO] [Anapolis] Switched to popup window
+[WARN] [Anapolis] Timeout attempt 2: Message: 
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x7ff7bc2f4435
+	0x7ff7bc2f4490
+	0x7ff7bc08d49d
+	0x7ff7bc0e82fe
+	0x7ff7bc0e860c
+	0x7ff7bc138b67
+	0x7ff7bc135728
+	0x7ff7bc0d8e38
+	0x7ff7bc0d9d23
+	0x7ff7bc5c3b30
+	0x7ff7bc5be3b8
+	0x7ff7bc5de72a
+	0x7ff7bc3107e5
+	0x7ff7bc31978c
+	0x7ff7bc2fd794
+	0x7ff7bc2fd946
+	0x7ff7bc2e3457
+	0x7ff8b5f4e8d7
+	0x7ff8b7fcc40c
+
+[INFO] [Anapolis] Attempt 3/3 for routine '1'
+[INFO] [Anapolis] Op1: Processing carteirinha 0064.8000.387928.00-0
+[INFO] [Anapolis] Navigating to Consulta (Anapolis sequence)...
+[INFO] [Anapolis] Standard click failed for MENU_CENTRO_61, trying JS...
+[INFO] [Anapolis] JS Clicked MENU_CENTRO_61
+[INFO] [Anapolis] Clicked MENU_ITEM_2
+[INFO] [Anapolis] Clicked SADTs em aberto (#centro_3)
+[INFO] [Anapolis] Looking for 'new_exame'...
+[INFO] [Anapolis] Clicked new_exame
+[INFO] [Anapolis] Switched to popup window
+[WARN] [Anapolis] Timeout attempt 3: Message: 
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x7ff7bc2f4435
+	0x7ff7bc2f4490
+	0x7ff7bc08d49d
+	0x7ff7bc0e82fe
+	0x7ff7bc0e860c
+	0x7ff7bc138b67
+	0x7ff7bc135728
+	0x7ff7bc0d8e38
+	0x7ff7bc0d9d23
+	0x7ff7bc5c3b30
+	0x7ff7bc5be3b8
+	0x7ff7bc5de72a
+	0x7ff7bc3107e5
+	0x7ff7bc31978c
+	0x7ff7bc2fd794
+	0x7ff7bc2fd946
+	0x7ff7bc2e3457
+	0x7ff8b5f4e8d7
+	0x7ff8b7fcc40c
+
+
+==================================================
+Results Found: 0
+==================================================
