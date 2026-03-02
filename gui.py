@@ -186,7 +186,13 @@ class SystemManagerApp:
         if raw_server_env:
             server_str = raw_server_env.strip('"').strip("'")
         else:
-            server_urls = [f"http://127.0.0.1:{9000+i}" for i in range(10)]
+            # Default fallback with hardcoded isolation
+            # 9000: Anápolis(2), 9001: Goiania(3), 9002: Anapolis(2), 9003: Goiania(3)...
+            server_urls = []
+            for i in range(10):
+                port = 9000 + i
+                conv = 2 if port % 2 == 0 else 3
+                server_urls.append(f"http://127.0.0.1:{port}:{conv}")
             server_str = ",".join(server_urls)
         try:
             d = multiprocessing.Process(target=run_dispatcher, args=(server_str, 15, self.log_queue, self.cmd_queue, self.active_workers), daemon=True)
