@@ -1,0 +1,332 @@
+role: Senior Software Architect & Automation Engineer
+context:
+  objective: >
+    Projetar e estruturar um worker local em Python com Selenium,
+    capaz de orquestrar múltiplos servidores de webscraping,
+    processar JOBs com hierarquia dinâmica de prioridades,
+    suportar múltiplos convênios, múltiplas rotinas e reutilização
+    de instâncias do ChromeDriver, mantendo arquitetura modular,
+    escalável e segura.
+
+  current_state:
+    - Worker existente roda apenas UNIMED
+    - Apenas rotina de consulta de guias
+    - Não há sistema de prioridades dinâmicas
+    - ChromeDriver dedicado a uma única tarefa
+    - Banco de dados não preparado para orquestração multi-job
+
+  target_state:
+    - Worker multiconvênio (IPASGO, UNIMED, AMIL, SULAMERICA)
+    - Dispatcher executando consultando jobs tal qual já programado
+    - 5 servidores de scraping simultâneos( aumentar 1)
+    - Priorização dinâmica por convênio, rotina e tempo
+    - Reuso controlado de instâncias Selenium
+    - Arquitetura modular por convênio
+    - Configurações isoladas (xpaths, urls, ids)
+    - Segurança de credenciais via banco de dados(atualmente está em .env)
+    - Observabilidade completa (logs, status, rastreabilidade)
+
+stack:
+  language: Python 3.11+
+  automation: Selenium 4.x
+  browser: Chrome + ChromeDriver
+  concurrency:
+    - multiprocessing
+    - threading (controle interno)
+  scheduling:
+    - dispatcher loop 
+  database:
+    - PostgreSQL (preferencial)
+    - ORM: SQLAlchemy
+  config_management:
+    - YAML + Python constants
+  logging:
+    - logging + rotating file handler
+  security:
+    - Credenciais no banco (hash + criptografia)
+    - .env apenas para chaves
+
+---
+
+architecture:
+  overview:
+    description: >
+      Arquitetura baseada em JOB QUEUE com dispatcher central,
+      múltiplos workers independentes e reutilização de instâncias
+      Selenium. Cada worker pode alternar convênios e rotinas,
+      respeitando prioridades globais e regras de escalonamento.
+
+  components:
+    dispatcher:
+      responsibility:
+        - Executar consulta de jobs
+        - Avaliar fila de JOBs
+        - Recalcular prioridades dinâmicas
+        - Alocar JOB ao servidor disponível
+      rules:
+        - Prioridade 0 sempre absoluta
+        - Prioridade ascendente baseada em tempo
+        - Em empate, executar JOB mais antigo
+        - Nunca interromper JOB em execução
+
+    worker:
+      responsibility:
+        - Manter instância ativa do ChromeDriver
+        - Executar rotinas Selenium
+        - Reportar status e métricas
+      capabilities:
+        - Trocar convênio sem reiniciar driver
+        - Executar múltiplas rotinas sequenciais
+        - Headless configurável por servidor
+
+    selenium_manager:
+      responsibility:
+        - Criar e manter instâncias ChromeDriver
+        - Pool de drivers por servidor
+        - Controle de headless on/off
+        - Timeouts e recuperação de erro
+
+    job_engine:
+      responsibility:
+        - Executar pipeline de rotinas
+        - Controlar estado do JOB
+        - Registrar logs e checkpoints
+
+    config_loader:
+      responsibility:
+        - Carregar configs por convênio
+        - Isolar xpaths, urls, ids, names
+        - Permitir atualização sem impacto global
+
+---
+
+servers:
+  scraping_servers:
+    count: 5
+    definition:
+      - id: server_01
+        headless: false
+        default_priority: 0
+        allowed_convenios: [UNIMED]
+        allowed_routines: [Consulta_guias, Captura_guias, Execução]
+
+      - id: server_02
+        headless: true
+        default_priority: 0
+        allowed_convenios: [IPASGO]
+        allowed_routines:
+          - login
+          - op1_autorizar_facplan
+          - op2_open_facplan
+          - op3_import_guias
+          - op4_confirma_guia
+          - op5_impress_guia
+          - op6_check_baixados
+          - op7_check_facplan
+          - op8_fat_facplan
+          - op9_anexos_facplan
+          - op10_recurso_glosa
+
+      - id: server_03
+        headless: true
+        default_priority: 0
+        allowed_convenios: [AMIL]
+
+      - id: server_04
+        headless: true
+        default_priority: 1
+        allowed_convenios: [SULAMERICA]
+
+      - id: server_05
+        headless: false
+        default_priority: 2
+        allowed_convenios: [UNIMED, IPASGO]
+
+---
+
+priority_rules:
+  levels:
+    0: critica
+    1: alta
+    2: media
+    3: baixa
+    4: muito_baixa
+    5: sem_prioridade
+
+  dynamic_escalation:
+    example:
+      convenio: UNIMED
+      rotina: Execução
+      timeout: 10min
+      base_priority: 2
+      escalated_priority: 1
+
+  selection_logic:
+    - Sempre escolher menor prioridade numérica
+    - Se múltiplos JOBs:
+        - escolher o mais antigo
+    - Recalcular prioridade a cada dispatcher cycle
+
+---
+
+job_model:
+  attributes:
+    - id_job
+    - convenio
+    - rotina
+    - prioridade_atual
+    - prioridade_base
+    - tempo_em_fila
+    - servidor_alocado
+    - status
+    - retries
+    - timestamps
+
+  status_flow:
+    - PENDING
+    - DISPATCHED
+    - RUNNING
+    - SUCCESS
+    - ERROR
+    - RETRY
+    - DEAD_LETTER
+
+---
+
+database:
+  tables:
+    execucoes:
+      fields:
+        - id_execucao
+        - guia
+        - status_biometria
+        - id_agendamento
+        - id_ficha
+        - status
+        - timestamps
+
+    fichas:
+      fields:
+        - id_ficha
+        - id_paciente
+        - id_convenio
+        - id_procedimento
+        - id_guia
+        - ids_agendamento[]
+        - status_assinatura
+        - status_conciliacao
+
+    prioridades:
+      fields:
+        - id_prioridade
+        - convenio
+        - rotina
+        - prioridade_base
+        - tempo_limite
+        - prioridade_escalada
+
+    tipo_faturamento:
+      fields:
+        - id_tipo
+        - tipo
+        - id_doc_autorizacao
+        - id_doc_faturamento
+
+    tipo_documentos:
+      fields:
+        - id_tipo_doc
+        - nome
+        - uso
+
+    modelo_documentos:
+      fields:
+        - id_modelo
+        - id_convenio
+        - nome_doc
+        - id_tipo_faturamento
+
+    procedimentos:
+      fields:
+        - id_procedimento
+        - nome
+        - codigo_procedimento
+        - id_convenio[]
+        - autorizacao
+        - faturamento
+        - status
+
+    procedimento_faturamento:
+      fields:
+        - id_proc_fat
+        - id_procedimento
+        - id_convenio
+        - valor
+        - data_inicio
+        - data_fim
+        - status
+
+    areas:
+      fields:
+        - id_area
+        - nome
+
+    convenios:
+      fields:
+        - id_convenio
+        - nome
+        - usuario
+        - senha_criptografada
+
+---
+
+filesystem:
+  structure:
+    root:
+      - config/
+          - settings.py
+          - constants.py
+      - core/
+          - dispatcher.py
+          - scheduler.py
+          - priority_engine.py
+          - selenium_manager.py
+      - infra/
+          - db/
+          - logging/
+      - jobs/
+          - base_job.py
+          - job_runner.py
+      - convenios/
+          - ipasgo/
+              - configs/
+              - op1_autorizar_facplan.py
+              - op2_open_facplan.py
+              - ...
+          - unimed/
+              - configs/
+              - consulta_guias.py
+              - captura_guias.py
+          - amil/
+          - sulamerica/
+      - logs/
+      - main.py
+
+---
+
+security:
+  guidelines:
+    - Credenciais nunca hardcoded
+    - Senhas criptografadas no banco
+    - Selenium sem logs sensíveis
+    - Auditoria por job e execução
+
+---
+
+deliverables:
+  - Diagrama de arquitetura
+  - Modelo de dados SQL
+  - Dispatcher funcional
+  - Worker reutilizando ChromeDriver
+  - Sistema de prioridade dinâmica
+  - Documentação técnica
+  - Checklists de implantação

@@ -1,0 +1,14 @@
+﻿id_procedimento;nome;id_area;codigo_procedimento;autorizacao;id_convenio;status;faturamento
+26;PSICOLOGIA ;6;2250005103;sim;3;ativo;sim
+27;FISIOTERAPIA;3;2250005111;sim;3;ativo;sim
+28;TERAPIA OCUPACIONAL;9;2250005170;sim;3;ativo;sim
+29;PSICOPEDAGOGIA;8;2250005278;sim;3;ativo;sim
+30;FONOAUDIOLOGIA;4;2250035189;sim;3;ativo;sim
+31;PSICOMOTRICIDADE;7;50000012;sim;3;ativo;sim
+32;MUSICOTERAPIA;5;50001213;sim;3;ativo;sim
+108;FONOAUDIOLOGIA;4;2250005189;sim;3;ativo;sim
+5;PSICOLOGIA - TEA;6;00011193;sim;6;ativo;sim
+7;FONOAUDIOLOGIA - TEA;4;00011185;sim;6;ativo;sim
+8;TERAPIA OCUPACIONAL - TEA;9;00040045;sim;6;ativo;sim
+9;PSICOLOGIA - ANAMNESE;6;50001221;sim;6;ativo;sim
+126;AVALIACAO NEUROPSICOLOGICA;6;80010040;sim;6;ativo;sim

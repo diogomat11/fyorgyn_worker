@@ -1,0 +1,167 @@
+﻿python : C:\dev\Agenda_
+hub_MultiConv\Local_wor
+ker\Worker\5-unimed_ana
+polis\core\scraper.py:2
+60: SAWarning: 
+Session's state has 
+been changed on a 
+non-active transaction 
+- this state will be 
+discarded.
+No linha:1 caractere:1
++ python 
+test_op2_anapolis.py 
+2>&1 | Out-File 
+-Encoding utf8 
+op2_output ...
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (C:\dev\Agenda   
+ _h...l be discarde    
+d.:String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+  self.db.rollback()
+DEBUG: get_fernet called
+DEBUG: FERNET_SECRET found, lens: 44
+DEBUG: Created Fernet instance: <cryptography.fernet.Fernet object at 0x000002046E9F17F0>
+>>> [Anapolis] Credentials loaded from DB for convenio 2
+
+[START] Op2 Test (Captura Guias)...
+[INFO] [Anapolis] Login performed
+[INFO] [Anapolis] Attempt 1/3 for routine '2'
+Failed to write log to DB: (psycopg2.errors.ForeignKeyViolation) insert or update on table "logs" violates foreign key constraint "logs_job_id_fkey"
+DETAIL:  Key (job_id)=(9999) is not present in table "jobs".
+
+[SQL: INSERT INTO logs (job_id, carteirinha_id, level, message) VALUES (%(job_id)s, %(carteirinha_id)s, %(level)s, %(message)s) RETURNING logs.id, logs.created_at]
+[parameters: {'job_id': 9999, 'carteirinha_id': None, 'level': 'INFO', 'message': "Attempt 1/3 for routine '2'"}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+[INFO] [Anapolis] Op1: Processing carteirinha 0064.8000.387928.00-0
+Failed to write log to DB: This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback(). Original exception was: (psycopg2.errors.ForeignKeyViolation) insert or update on table "logs" violates foreign key constraint "logs_job_id_fkey"
+DETAIL:  Key (job_id)=(9999) is not present in table "jobs".
+
+[SQL: INSERT INTO logs (job_id, carteirinha_id, level, message) VALUES (%(job_id)s, %(carteirinha_id)s, %(level)s, %(message)s) RETURNING logs.id, logs.created_at]
+[parameters: {'job_id': 9999, 'carteirinha_id': None, 'level': 'INFO', 'message': "Attempt 1/3 for routine '2'"}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj) (Background on this error at: https://sqlalche.me/e/20/7s2a)
+[INFO] [Anapolis] Navigating to Consulta (Anapolis sequence)...
+Failed to write log to DB: This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback(). Original exception was: (psycopg2.errors.ForeignKeyViolation) insert or update on table "logs" violates foreign key constraint "logs_job_id_fkey"
+DETAIL:  Key (job_id)=(9999) is not present in table "jobs".
+
+[SQL: INSERT INTO logs (job_id, carteirinha_id, level, message) VALUES (%(job_id)s, %(carteirinha_id)s, %(level)s, %(message)s) RETURNING logs.id, logs.created_at]
+[parameters: {'job_id': 9999, 'carteirinha_id': None, 'level': 'INFO', 'message': "Attempt 1/3 for routine '2'"}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj) (Background on this error at: https://sqlalche.me/e/20/7s2a)
+[INFO] [Anapolis] Clicked MENU_CENTRO_61
+Failed to write log to DB: This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback(). Original exception was: (psycopg2.errors.ForeignKeyViolation) insert or update on table "logs" violates foreign key constraint "logs_job_id_fkey"
+DETAIL:  Key (job_id)=(9999) is not present in table "jobs".
+
+[SQL: INSERT INTO logs (job_id, carteirinha_id, level, message) VALUES (%(job_id)s, %(carteirinha_id)s, %(level)s, %(message)s) RETURNING logs.id, logs.created_at]
+[parameters: {'job_id': 9999, 'carteirinha_id': None, 'level': 'INFO', 'message': "Attempt 1/3 for routine '2'"}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj) (Background on this error at: https://sqlalche.me/e/20/7s2a)
+[INFO] [Anapolis] Clicked MENU_ITEM_2
+Failed to write log to DB: This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback(). Original exception was: (psycopg2.errors.ForeignKeyViolation) insert or update on table "logs" violates foreign key constraint "logs_job_id_fkey"
+DETAIL:  Key (job_id)=(9999) is not present in table "jobs".
+
+[SQL: INSERT INTO logs (job_id, carteirinha_id, level, message) VALUES (%(job_id)s, %(carteirinha_id)s, %(level)s, %(message)s) RETURNING logs.id, logs.created_at]
+[parameters: {'job_id': 9999, 'carteirinha_id': None, 'level': 'INFO', 'message': "Attempt 1/3 for routine '2'"}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj) (Background on this error at: https://sqlalche.me/e/20/7s2a)
+[INFO] [Anapolis] Clicked SADTs em aberto (#centro_3)
+Failed to write log to DB: This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback(). Original exception was: (psycopg2.errors.ForeignKeyViolation) insert or update on table "logs" violates foreign key constraint "logs_job_id_fkey"
+DETAIL:  Key (job_id)=(9999) is not present in table "jobs".
+
+[SQL: INSERT INTO logs (job_id, carteirinha_id, level, message) VALUES (%(job_id)s, %(carteirinha_id)s, %(level)s, %(message)s) RETURNING logs.id, logs.created_at]
+[parameters: {'job_id': 9999, 'carteirinha_id': None, 'level': 'INFO', 'message': "Attempt 1/3 for routine '2'"}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj) (Background on this error at: https://sqlalche.me/e/20/7s2a)
+[INFO] [Anapolis] Looking for 'new_exame'...
+Failed to write log to DB: This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback(). Original exception was: (psycopg2.errors.ForeignKeyViolation) insert or update on table "logs" violates foreign key constraint "logs_job_id_fkey"
+DETAIL:  Key (job_id)=(9999) is not present in table "jobs".
+
+[SQL: INSERT INTO logs (job_id, carteirinha_id, level, message) VALUES (%(job_id)s, %(carteirinha_id)s, %(level)s, %(message)s) RETURNING logs.id, logs.created_at]
+[parameters: {'job_id': 9999, 'carteirinha_id': None, 'level': 'INFO', 'message': "Attempt 1/3 for routine '2'"}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj) (Background on this error at: https://sqlalche.me/e/20/7s2a)
+[INFO] [Anapolis] Clicked new_exame
+Failed to write log to DB: This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback(). Original exception was: (psycopg2.errors.ForeignKeyViolation) insert or update on table "logs" violates foreign key constraint "logs_job_id_fkey"
+DETAIL:  Key (job_id)=(9999) is not present in table "jobs".
+
+[SQL: INSERT INTO logs (job_id, carteirinha_id, level, message) VALUES (%(job_id)s, %(carteirinha_id)s, %(level)s, %(message)s) RETURNING logs.id, logs.created_at]
+[parameters: {'job_id': 9999, 'carteirinha_id': None, 'level': 'INFO', 'message': "Attempt 1/3 for routine '2'"}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj) (Background on this error at: https://sqlalche.me/e/20/7s2a)
+[INFO] [Anapolis] Switched to popup window
+Failed to write log to DB: This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback(). Original exception was: (psycopg2.errors.ForeignKeyViolation) insert or update on table "logs" violates foreign key constraint "logs_job_id_fkey"
+DETAIL:  Key (job_id)=(9999) is not present in table "jobs".
+
+[SQL: INSERT INTO logs (job_id, carteirinha_id, level, message) VALUES (%(job_id)s, %(carteirinha_id)s, %(level)s, %(message)s) RETURNING logs.id, logs.created_at]
+[parameters: {'job_id': 9999, 'carteirinha_id': None, 'level': 'INFO', 'message': "Attempt 1/3 for routine '2'"}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj) (Background on this error at: https://sqlalche.me/e/20/7s2a)
+[INFO] [Anapolis] Clicking ignora-cartao
+Failed to write log to DB: This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback(). Original exception was: (psycopg2.errors.ForeignKeyViolation) insert or update on table "logs" violates foreign key constraint "logs_job_id_fkey"
+DETAIL:  Key (job_id)=(9999) is not present in table "jobs".
+
+[SQL: INSERT INTO logs (job_id, carteirinha_id, level, message) VALUES (%(job_id)s, %(carteirinha_id)s, %(level)s, %(message)s) RETURNING logs.id, logs.created_at]
+[parameters: {'job_id': 9999, 'carteirinha_id': None, 'level': 'INFO', 'message': "Attempt 1/3 for routine '2'"}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj) (Background on this error at: https://sqlalche.me/e/20/7s2a)
+[INFO] [Anapolis] Clicking cad_Benef
+Failed to write log to DB: This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback(). Original exception was: (psycopg2.errors.ForeignKeyViolation) insert or update on table "logs" violates foreign key constraint "logs_job_id_fkey"
+DETAIL:  Key (job_id)=(9999) is not present in table "jobs".
+
+[SQL: INSERT INTO logs (job_id, carteirinha_id, level, message) VALUES (%(job_id)s, %(carteirinha_id)s, %(level)s, %(message)s) RETURNING logs.id, logs.created_at]
+[parameters: {'job_id': 9999, 'carteirinha_id': None, 'level': 'INFO', 'message': "Attempt 1/3 for routine '2'"}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj) (Background on this error at: https://sqlalche.me/e/20/7s2a)
+[INFO] [Anapolis] Clicking botao_verificar
+Failed to write log to DB: This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback(). Original exception was: (psycopg2.errors.ForeignKeyViolation) insert or update on table "logs" violates foreign key constraint "logs_job_id_fkey"
+DETAIL:  Key (job_id)=(9999) is not present in table "jobs".
+
+[SQL: INSERT INTO logs (job_id, carteirinha_id, level, message) VALUES (%(job_id)s, %(carteirinha_id)s, %(level)s, %(message)s) RETURNING logs.id, logs.created_at]
+[parameters: {'job_id': 9999, 'carteirinha_id': None, 'level': 'INFO', 'message': "Attempt 1/3 for routine '2'"}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj) (Background on this error at: https://sqlalche.me/e/20/7s2a)
+[INFO] [Anapolis] Prefix 0064 != 0178. Checking atualiza_benef...
+Failed to write log to DB: This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback(). Original exception was: (psycopg2.errors.ForeignKeyViolation) insert or update on table "logs" violates foreign key constraint "logs_job_id_fkey"
+DETAIL:  Key (job_id)=(9999) is not present in table "jobs".
+
+[SQL: INSERT INTO logs (job_id, carteirinha_id, level, message) VALUES (%(job_id)s, %(carteirinha_id)s, %(level)s, %(message)s) RETURNING logs.id, logs.created_at]
+[parameters: {'job_id': 9999, 'carteirinha_id': None, 'level': 'INFO', 'message': "Attempt 1/3 for routine '2'"}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj) (Background on this error at: https://sqlalche.me/e/20/7s2a)
+[INFO] [Anapolis] Waiting for conteudo_submenu form...
+Failed to write log to DB: This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback(). Original exception was: (psycopg2.errors.ForeignKeyViolation) insert or update on table "logs" violates foreign key constraint "logs_job_id_fkey"
+DETAIL:  Key (job_id)=(9999) is not present in table "jobs".
+
+[SQL: INSERT INTO logs (job_id, carteirinha_id, level, message) VALUES (%(job_id)s, %(carteirinha_id)s, %(level)s, %(message)s) RETURNING logs.id, logs.created_at]
+[parameters: {'job_id': 9999, 'carteirinha_id': None, 'level': 'INFO', 'message': "Attempt 1/3 for routine '2'"}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj) (Background on this error at: https://sqlalche.me/e/20/7s2a)
+[INFO] [Anapolis] Op2 (Captura) targets: ['15089518']
+Failed to write log to DB: This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback(). Original exception was: (psycopg2.errors.ForeignKeyViolation) insert or update on table "logs" violates foreign key constraint "logs_job_id_fkey"
+DETAIL:  Key (job_id)=(9999) is not present in table "jobs".
+
+[SQL: INSERT INTO logs (job_id, carteirinha_id, level, message) VALUES (%(job_id)s, %(carteirinha_id)s, %(level)s, %(message)s) RETURNING logs.id, logs.created_at]
+[parameters: {'job_id': 9999, 'carteirinha_id': None, 'level': 'INFO', 'message': "Attempt 1/3 for routine '2'"}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj) (Background on this error at: https://sqlalche.me/e/20/7s2a)
+[INFO] [Anapolis] Found 12 rows
+Failed to write log to DB: This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback(). Original exception was: (psycopg2.errors.ForeignKeyViolation) insert or update on table "logs" violates foreign key constraint "logs_job_id_fkey"
+DETAIL:  Key (job_id)=(9999) is not present in table "jobs".
+
+[SQL: INSERT INTO logs (job_id, carteirinha_id, level, message) VALUES (%(job_id)s, %(carteirinha_id)s, %(level)s, %(message)s) RETURNING logs.id, logs.created_at]
+[parameters: {'job_id': 9999, 'carteirinha_id': None, 'level': 'INFO', 'message': "Attempt 1/3 for routine '2'"}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj) (Background on this error at: https://sqlalche.me/e/20/7s2a)
+[INFO] [Anapolis] Prepared capture for Guia 15089518
+Failed to write log to DB: This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback(). Original exception was: (psycopg2.errors.ForeignKeyViolation) insert or update on table "logs" violates foreign key constraint "logs_job_id_fkey"
+DETAIL:  Key (job_id)=(9999) is not present in table "jobs".
+
+[SQL: INSERT INTO logs (job_id, carteirinha_id, level, message) VALUES (%(job_id)s, %(carteirinha_id)s, %(level)s, %(message)s) RETURNING logs.id, logs.created_at]
+[parameters: {'job_id': 9999, 'carteirinha_id': None, 'level': 'INFO', 'message': "Attempt 1/3 for routine '2'"}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj) (Background on this error at: https://sqlalche.me/e/20/7s2a)
+[INFO] [Anapolis] Clicked button_confirmar_voltar
+Failed to write log to DB: This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback(). Original exception was: (psycopg2.errors.ForeignKeyViolation) insert or update on table "logs" violates foreign key constraint "logs_job_id_fkey"
+DETAIL:  Key (job_id)=(9999) is not present in table "jobs".
+
+[SQL: INSERT INTO logs (job_id, carteirinha_id, level, message) VALUES (%(job_id)s, %(carteirinha_id)s, %(level)s, %(message)s) RETURNING logs.id, logs.created_at]
+[parameters: {'job_id': 9999, 'carteirinha_id': None, 'level': 'INFO', 'message': "Attempt 1/3 for routine '2'"}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj) (Background on this error at: https://sqlalche.me/e/20/7s2a)
+
+==================================================
+Results Captured: 1
+  - Guia: 15089518 | Status: Capturado | Data: 01/08/2025 
+==================================================

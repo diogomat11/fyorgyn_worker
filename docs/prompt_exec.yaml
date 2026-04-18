@@ -1,0 +1,282 @@
+projeto: execucao_sessoes_ipasgo
+modulo: facplan_execucao_guia
+descricao: >
+  Implantação do modal de execução de sessões no portal IPASGO (Facplan),
+  utilizando automação baseada em elementos data-bind ao invés de XPath sempre que possível.
+  O fluxo deve executar sessões autorizadas da guia conforme quantidade realizada,
+  respeitando estados do portal e validações de carteira do beneficiário.
+
+atores:
+  - dev
+  - po
+  - qa
+
+regras_gerais_projeto:
+  - consultar padroes existentes do projeto para:
+      - estrutura de pastas
+      - padrao de scripts
+      - convencoes de codigo
+  - nao modificar modais existentes
+  - nao alterar fluxos existentes sem solicitacao explicita
+  - nao sugerir novas funcionalidades fora das descritas
+  - manter compatibilidade com rotinas de login existentes
+  - reutilizar rotinas de espera overlay ja implementadas (rotina_3)
+
+banco_de_dados:
+
+  alteracoes:
+
+    adicionar_coluna:
+      tabela: guias
+      coluna: sessoes_realizadas
+      tipo: inteiro
+      descricao: >
+        quantidade de agendamentos com status "confirmado"
+        vinculados à guia.
+
+  regras_calculo:
+
+    sessoes_realizadas:
+      descricao: >
+        contagem de agendamentos vinculados à guia
+        com status = confirmado
+
+    saldo:
+      descricao: >
+        saldo = Autorizado - realizado + contagem de agendamentos
+        com guia vinculada e status = "A confirmar")
+
+  parametros_job:
+    - carteira
+    - guia
+    - sessoes_realizadas
+
+fluxo_legado:
+
+  login:
+    descricao: executar rotina padrão de login
+
+  validacao_aba:
+    verificar: existencia da aba facplan
+
+fluxo_execucao:
+
+  etapa_1_direcionamento:
+    acao: acessar pagina localizar procedimentos
+
+  etapa_2_filtragem:
+
+    passos:
+      - limpar campos de filtro
+      - clicar botao pesquisa
+      - aguardar saida overlay utilizando rotina_3
+
+  etapa_3_localizacao_guia:
+
+    verificacao_nao_localizada:
+      elemento:
+        atributo: data-bind
+        valor: "visible: !possuiProcedimentos() && pesquisaEfetuada()"
+      texto:
+        contem: "!Nenhum procedimento encontrado."
+      resultado:
+        status: guia_nao_localizada
+        acao:
+          - registrar log
+          - encerrar job
+
+    verificacao_localizada:
+      elemento:
+        atributo: data-bind
+        valor: "text: NumeroGuiaOperadora"
+      resultado:
+        status: guia_localizada
+
+tratamento_erros:
+
+  guia_nao_encontrada:
+
+    passos:
+      - logout
+      - registrar log: "erro sessão expirada"
+      - fechar aba
+      - retornar aba anterior
+      - fechar menu
+      - executar rotina_pos_login:
+          - linkfacplan
+          - mudar foco para aba
+      - retornar para etapa filtragem da guia
+
+fluxo_sucesso:
+
+  localizar_icone_confirmacao:
+
+    elemento:
+      atributo: data-bind
+      valor: "click: $root.abrirModalConfirmarProcedimentos"
+
+    se_nao_localizado:
+      acao:
+        - encerrar job
+        - log: "Guia de consulta, execução dispensada"
+
+    se_localizado:
+
+      verificar_estado_guia:
+
+        atributo:
+          style: "filter: grayscale(1);"
+
+        se_sim:
+          acao:
+            - encerrar job
+            - log: "Guia totalmente executada"
+
+        se_nao:
+          iniciar_loop_execucao
+
+loop_execucao:
+
+  abrir_modal:
+    acao:
+      - clicar icone confirmar-procedimento
+
+  identificar_tabela:
+
+    elemento:
+      class: card-body
+
+    regra:
+      linhas_tabela: igual_quantidade_autorizada
+
+  iteracao_execucao:
+
+    estrutura_loop:
+      variavel: i
+      inicio: 1
+      fim: realizado
+
+    identificador_execucao:
+      class: "col-xs-{i}"
+
+    verificacao_execucao:
+
+      condicao:
+        texto_diferente: "Não confirmado"
+
+      resultado:
+        item_ja_executado: true
+
+  logica_execucao:
+
+    condicao:
+      executados < realizado
+
+    passos:
+
+      identificar_botao_confirmar:
+        elemento:
+          atributo: data-bind
+          valor: "visible: HabilitadoConfirmacao"
+
+      acao:
+        - clicar botao confirmar
+        - aguardar 1s
+
+      preencher_carteira:
+
+        campo:
+          xpath: //*[@id="numeroDaCarteiraConfirmacao"]
+
+        passos:
+          - clear
+          - inserir valor carteira
+          - aguardar 1s
+          - pressionar TAB
+          - aguardar 1s
+
+      validacao_beneficiario:
+
+        verificacao_notificacao:
+          elemento:
+            class: noty_text
+
+        se_visivel:
+
+          carteira_invalida:
+            acao:
+              - registrar log: "Carteira invalida"
+              - registrar texto exibido na notificação
+
+          fechar_notificacao:
+            elemento:
+              class: "fa fa-times fa-fw close"
+
+      sucesso_execucao:
+
+        verificacao:
+          texto_notificacao:
+            contem: "Procedimento confirmado com sucesso."
+
+  fechamento_modal:
+
+    fechar_confirmacao:
+      xpath: //*[@id="indentificar-confirmar-procedimentos-modal"]/div/div/div[3]/div/button[1]
+
+    fechar_execucao:
+      xpath: /html/body/main/div[2]/div[10]/div/div/div[3]/button
+
+  condicao_saida_loop:
+
+    verificar_execucoes:
+      condicao: execucoes >= realizado
+
+    se_sim:
+      sair_loop
+
+    se_nao:
+      continuar_loop
+
+logs_padrao:
+
+  - guia_nao_localizada
+  - guia_totalmente_executada
+  - guia_consulta_execucao_dispensada
+  - carteira_invalida
+  - procedimento_confirmado
+  - sessao_expirada
+
+criterios_aceite_po:
+
+  - sistema localiza guia corretamente
+  - execução ocorre apenas quando necessário
+  - sessões confirmadas respeitam limite realizado
+  - carteira inválida interrompe execução
+  - logs são registrados conforme eventos
+
+plano_testes_qa:
+
+  cenarios:
+
+    - guia inexistente
+    - guia localizada sem procedimentos
+    - guia totalmente executada
+    - guia parcialmente executada
+    - carteira inválida
+    - confirmação bem sucedida
+    - sessão expirada durante execução
+    - falha na abertura do modal
+
+  validacoes:
+
+    - modal abre corretamente
+    - campos de carteira são preenchidos
+    - confirmação é registrada
+    - logs correspondem aos eventos
+
+restricoes:
+
+  - nao alterar modais existentes
+  - nao alterar estrutura do portal
+  - nao modificar rotinas globais
+  - utilizar apenas elementos descritos neste fluxo
