@@ -24,7 +24,7 @@ Esta documentação define os padrões arquiteturais estritos (Frontend, Backend
 
 ## ⚠️ MÓDULOS ESTÁVEIS — ALTERAÇÃO SOMENTE POR PEDIDO EXPRESSO
 
-> Os módulos abaixo estão **100% funcionais e validados em produção**. Qualquer alteração — mesmo refatoração interna — exige **pedido explícito e aprovação do Product Owner**. Nenhum desenvolvedor deve modificá-los por iniciativa própria.
+> Os módulos abaixo estão **100% funcionais e validados em produção**. Qualquer alteração — mesmo refatoração interna — exige **pedido explícito e aprovação do Product Owner**. Nenhum desenvolvedor deve modificá-los por iniciativa própria. Para as implantações da Unimed Goiania, NÃO deve ser feito alterações nas rotinas da Unimed Anápolis, nem mesmo na rotina 0 e 1 da Unimed Goiania que já estão estáveis, exceto se solicitado explicitamente pelo usuário.
 
 | Módulo | Path | Rotinas Estáveis |
 |---|---|---|
@@ -181,3 +181,4 @@ A Rotina 1 da Unimed Anápolis é executada para **cada carteirinha** via o sist
    - Organizar a pasta raiz do backend isolando os `apply_migration.py` extintos.
 4. **Criação do `/docs` Mestre**:
    - Materializar o schema consolidado dos workflows na raiz sob a nova documentação PO.
+- Regra: responder no chat apenas em português - brasileiro

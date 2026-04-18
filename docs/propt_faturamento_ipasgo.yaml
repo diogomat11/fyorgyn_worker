@@ -1,0 +1,249 @@
+```yaml
+project: webplan_faturamento_worker_upgrade
+version: 1.0
+objective: >
+  Evoluir o worker existente para consumir a API do portal WebPlan (Facil Informática)
+  após autenticação via Selenium, eliminando navegação desnecessária e aumentando performance.
+
+rules:
+  - NÃO alterar módulos existentes não mencionados
+  - NÃO modificar op0_login.py
+  - Seguir arquitetura atual de dispatcher + worker
+  - Aplicar princípios: DRY, SRP, Clean Code
+  - Todo novo código deve ser modular e reutilizável
+  - Separar responsabilidades: autenticação, requisição, parser, persistência
+
+stack:
+  language: python
+  libraries:
+    - selenium
+    - requests
+    - beautifulsoup4
+    - json
+    - datetime
+    - logging
+
+# =========================================================
+# 1. AUTENTICAÇÃO E EXTRAÇÃO DE COOKIES
+# =========================================================
+
+auth:
+  source_module: op0_login.py
+  requirement: >
+    Após execução do login e abertura do portal WebPlan (novowebplan),
+    extrair automaticamente cookies da sessão autenticada.
+
+  cookies_required:
+    - AWSALBTG
+    - AWSALBTGCORS
+    - AWSALB
+    - AWSALBCORS
+
+  implementation:
+    create_function: get_authenticated_session
+    description: >
+      Captura cookies do Selenium e converte para requests.Session()
+
+    steps:
+      - obter driver ativo do Selenium (já logado)
+      - garantir navegação para:
+        url: https://novowebplanipasgo.facilinformatica.com.br
+      - aguardar carregamento completo
+      - extrair cookies via driver.get_cookies()
+      - converter cookies para formato dict
+      - criar requests.Session()
+      - injetar cookies na sessão
+      - retornar session
+
+    output:
+      type: requests.Session
+
+# =========================================================
+# 2. CLIENTE HTTP (REUTILIZÁVEL)
+# =========================================================
+
+http_client:
+  create_module: webplan_client.py
+
+  functions:
+    - name: post_load_detalhes
+      description: Requisição principal de listagem
+      method: POST
+      url: https://novowebplanipasgo.facilinformatica.com.br/FaturamentoAtendimentos/LoadDetalhes
+
+      headers:
+        Content-Type: application/json;charset=UTF-8
+        X-Requested-With: XMLHttpRequest
+
+      payload_template:
+        loteId: int
+        status: [67, 78, 82]
+        page: int
+        quantidadePorPagina: "100"
+        filtroDetalhesBeneficiario: ""
+        filtroDetalhesSenhaGuia: ""
+        filtroDetalhesMedExec: ""
+        filtroExibirNaoConfirmados: false
+        ordenaPor: "DataLiberacao"
+        codigoPrestador: string
+
+# =========================================================
+# 3. PARSER DE RESPOSTA
+# =========================================================
+
+parser:
+  create_module: webplan_parser.py
+
+  functions:
+    - name: parse_detalhes
+      input: json_response
+      output: list_of_dicts
+
+      mapping:
+        loteId: root
+        detalheId: Id
+        CodigoBeneficiario: CodigoBeneficiario
+        dataRealizacao: DataRealizacaoProcedimento
+        Guia: Guia
+        StatusConferencia: StatusConferencia
+        ValorProcedimento: ValorProcedimento
+
+      transformations:
+        - dataRealizacao:
+            format: dd/mm/yyyy
+        - ValorProcedimento:
+            type: float
+
+    - name: extract_total_pages
+      input: json_response
+      output: int
+      field: NumberOfPages
+
+# =========================================================
+# 4. WORKER - OP6_CHECK_BAIXADOS
+# =========================================================
+
+worker_op6:
+  file: op6_check_baixados.py
+
+  responsibilities:
+    - consumir API paginada
+    - extrair dados
+    - persistir no banco
+
+  flow:
+    - receber loteId e IdPrestador
+    - obter session autenticada
+    - chamar page=0
+    - extrair NumberOfPages
+    - loop pages:
+        for page in range(0, total_pages):
+          - chamar API
+          - parse resposta
+          - persistir
+
+  persistence:
+    table: faturamento_lotes
+
+    fields:
+      - loteId
+      - detalheId
+      - CodigoBeneficiario
+      - dataRealizacao
+      - Guia
+      - StatusConferencia
+      - ValorProcedimento
+
+# =========================================================
+# 5. WORKER - OP7 FATURAMENTO
+# =========================================================
+
+worker_op7:
+  file: op7_fat_facplan.py
+
+  endpoint:
+    url: https://novowebplanipasgo.facilinformatica.com.br/FaturamentoAtendimentos/ModificarDetalhe
+    method: POST
+    content_type: application/x-www-form-urlencoded
+
+  payload:
+    detalheId: int
+    status: int
+    dataRealizacao: dd/mm/yyyy
+    valorOutrasDespesas: 0
+    atualizarValorProcedimento: false
+    valorProcedimento: ""
+
+  flow:
+    - receber parametros
+    - garantir sessão ativa
+    - enviar requisição
+    - validar retorno
+
+# =========================================================
+# 6. BANCO DE DADOS
+# =========================================================
+
+database:
+  table: faturamento_lotes
+
+  schema:
+    loteId: integer
+    detalheId: integer
+    CodigoBeneficiario: string
+    StatusConciliacao: enum [sim, pendente, nao]
+    dataRealizacao: date
+    Guia: integer
+    StatusConferencia: integer
+    ValorProcedimento: decimal
+
+  rules:
+    - detalheId é chave única
+    - evitar duplicidade (UPSERT)
+    - normalizar datas
+    - padronizar valores monetários
+
+# =========================================================
+# 7. BOAS PRÁTICAS OBRIGATÓRIAS
+# =========================================================
+
+best_practices:
+  - usar logging estruturado
+  - tratar exceções HTTP
+  - retry automático (3 tentativas)
+  - timeout nas requisições
+  - separar config de código
+  - não duplicar lógica de requisição
+  - não acoplar parser ao worker
+  - funções pequenas e coesas
+
+# =========================================================
+# 8. PERFORMANCE
+# =========================================================
+
+performance:
+  - usar quantidadePorPagina = 100
+  - evitar Selenium após login
+  - usar requests.Session (keep-alive)
+  - possibilidade futura de paralelismo por páginas
+
+# =========================================================
+# 9. SEGURANÇA
+# =========================================================
+
+security:
+  - não logar cookies
+  - não persistir sessão em disco
+  - proteger credenciais
+  - validar resposta da API (HasError)
+
+# =========================================================
+# 10. NÃO FAZER
+# =========================================================
+
+constraints:
+  - não alterar op0_login.py
+  - não usar Selenium para paginação
+  - não parsear HTML desnecessariamente
+  - não duplicar código entre workers
+```
