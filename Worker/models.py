@@ -15,7 +15,7 @@ class Carteirinha(Base):
     carteirinha = Column(Text, unique=True, nullable=False)
     paciente = Column(Text)
     id_paciente = Column(Integer, index=True)
-    id_pagamento = Column(Integer, index=True)
+    codigo_beneficiario = Column(Text, nullable=True)
     status = Column(Text, default="ativo")
     id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -38,6 +38,7 @@ class Job(Base):
     status = Column(Text, nullable=False, default="pending")
     attempts = Column(Integer, default=0)
     priority = Column(Integer, default=0)
+    depending_id = Column(Integer, ForeignKey("jobs.id", ondelete="SET NULL"), nullable=True)
     locked_by = Column(Text)
     timeout = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -54,6 +55,7 @@ class BaseGuia(Base):
     carteirinha_id = Column(Integer, ForeignKey("carteirinhas.id", ondelete="CASCADE"))
     id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="SET NULL"), nullable=True)
     guia = Column(Text)
+    codigo_beneficiario = Column(Text, nullable=True)
     data_autorizacao = Column(Date)
     senha = Column(Text)
     status_guia = Column(Text, default="Autorizado")
@@ -61,6 +63,7 @@ class BaseGuia(Base):
     codigo_terapia = Column(Text)
     qtde_solicitada = Column(Integer)
     sessoes_autorizadas = Column(Integer)
+    timestamp_captura = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -87,6 +90,9 @@ class Convenio(Base):
     nome = Column(Text, nullable=False)
     usuario = Column(Text)
     senha_criptografada = Column(Text)
+    biometria = Column(Boolean, default=False)
+    timeout_captura = Column(Boolean, default=False)
+    pei_automatico = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -97,7 +103,7 @@ class PriorityRule(Base):
     id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="CASCADE"))
     rotina = Column(Text)
     base_priority = Column(Integer, default=1)
-    weight_per_day = Column(Text) 
+    weight_per_day = Column(Text)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -192,3 +198,19 @@ class Area(Base):
 
     id_area = Column(Integer, primary_key=True, index=True)
     nome = Column(Text, nullable=False)
+
+class FaturamentoLote(Base):
+    __tablename__ = "faturamento_lotes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    loteId = Column(Integer, index=True)
+    detalheId = Column(Integer, unique=True, index=True, nullable=False)
+    CodigoBeneficiario = Column(Text)
+    StatusConciliacao = Column(Text, default="pendente")
+    dataRealizacao = Column(Date)
+    Guia = Column(Text)
+    StatusConferencia = Column(Integer)
+    ValorProcedimento = Column(Float)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+

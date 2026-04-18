@@ -345,6 +345,17 @@ def execute(scraper, job_data):
                         DataTable = scraper.driver.find_element(By.XPATH, '//*[@id="conteudo-submenu"]/table[2]')
                         row_xpath = f'//*[@id="conteudo-submenu"]/table[2]/tbody/tr[{idx+1}]'
                         
+                        # Se já coletou a guia alvo solicitada (op1 com param 'numero_guia'), pode parar
+                        alvo = job_data.get("numero_guia")
+                        if alvo and any(str(g.get("numero_guia")) == str(alvo) for g in collected_data):
+                            scraper.log(f"Guia alvo {alvo} já localizada e raspada. Parando busca.", job_id=job_id)
+                            # Close popup and return to base window
+                            try:
+                                scraper.driver.close()
+                                scraper.driver.switch_to.window(scraper.driver.window_handles[0])
+                            except: pass
+                            return collected_data
+                            
                         if not is_element_present(scraper.driver, By.XPATH, f'{row_xpath}/td[6]'):
                             continue
 
@@ -479,13 +490,21 @@ def execute(scraper, job_data):
 
                 # Pagination
                 try:
-                    next_links = scraper.driver.find_elements(By.LINK_TEXT, "Próxima")
-                    if len(next_links) == 0:
+                    next_links = scraper.driver.find_elements(By.XPATH, "//a[contains(text(),'Próxima') or contains(text(),'>') or contains(translate(text(), 'P', 'p'), 'próxima')]")
+                    if not next_links:
+                        # try finding the last page button by looking for inner text numbers higher than current
+                        # or just fallback to stopping
                         break # No more pages
-                    scraper.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", next_links[0])
-                    next_links[0].click()
-                    time.sleep(2)
-                except Exception:
+
+                    scraper.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", next_links[-1])
+                    time.sleep(0.5)
+                    try:
+                        next_links[-1].click()
+                    except:
+                        scraper.driver.execute_script("arguments[0].click();", next_links[-1])
+                    time.sleep(3)
+                except Exception as e:
+                    scraper.log(f"Fim da paginação ou erro ao avançar: {e}", job_id=job_id)
                     break
 
             except Exception as table_e:

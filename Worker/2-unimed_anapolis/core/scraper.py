@@ -69,9 +69,21 @@ class UnimedAnopolisScraper(BaseScraper):
                 self.password = decrypt_password(conv.senha_criptografada)
                 print(f">>> [Anapolis] Credentials loaded from DB for convenio {self.id_convenio}")
             else:
-                print(f">>> [Anapolis] WARNING: No credentials in DB for convenio {self.id_convenio}")
+                msg = f"[Anapolis] ERRO: Credenciais ausentes no banco para convenio {self.id_convenio}"
+                print(f">>> {msg}")
+                if self.db:
+                    try:
+                        self.db.add(Log(level="ERROR", message=msg))
+                        self.db.commit()
+                    except: self.db.rollback()
         except Exception as e:
-            print(f">>> [Anapolis] Failed to load credentials from DB: {e}")
+            msg = f"[Anapolis] ERRO ao carregar credenciais do banco: {e}"
+            print(f">>> {msg}")
+            if self.db:
+                try:
+                    self.db.add(Log(level="ERROR", message=msg))
+                    self.db.commit()
+                except: self.db.rollback()
 
     # ── Logging ──────────────────────────────────────────────
 
@@ -118,11 +130,11 @@ class UnimedAnopolisScraper(BaseScraper):
 
     def login(self):
         """Executa login no SGUCard Unimed Anapolis."""
+        if not self.username or not self.password:
+            raise ValueError("PermanentError: Credentials not loaded. Check convenio DB entry.")
+
         if not self.driver:
             self.start_driver()
-
-        if not self.username or not self.password:
-            raise ValueError("Credentials not loaded. Check convenio DB entry.")
 
         try:
             self.driver.get(LOGIN_URL)
@@ -197,22 +209,45 @@ class UnimedAnopolisScraper(BaseScraper):
                     job_id=job_id
                 )
 
-                # Re-login on retry
-                if attempt > 0:
+                # On first attempt: always ensure login. On retries: reuse driver if session present.
+                if attempt == 0:
+                    # First run: check if session is already active (driver reused from pool)
+                    session_active = False
                     try:
-                        if not self.driver or not self.driver.title:
-                            self.start_driver()
-                            self.login()
+                        # Check if the driver is alive and already exploring the sgucard domain
+                        if len(self.driver.window_handles) > 0 and 'sgucard' in self.driver.current_url.lower() and 'login' not in self.driver.current_url.lower():
+                            session_active = True
+                            self.log("Session already active. Skipping login.", job_id=job_id)
                     except:
-                        self.start_driver()
+                        pass
+                    if not session_active:
                         self.login()
-
-                # ── Ensure Login State Before Any Routine ──
-                try:
-                    self.driver.find_element(By.ID, "mainMenuItem2")
-                except:
-                    if not self.driver: self.start_driver()
+                else:
+                    # Retry: ensure we have a driver. We don't call start_driver here 
+                    # because we want to reuse the managed pool from server.py.
+                    if not self.driver:
+                        raise Exception("Driver lost during retry. Aborting to allow manager to recover.")
+                    
+                    try:
+                        # Simple test if alive
+                        self.driver.title
+                    except:
+                        raise Exception("Driver died during retry. Aborting to allow manager to recover.")
+                    
                     self.login()
+
+                # ── Isolate Environment (Fix Crosstalk) ──
+                import sys, os
+                _mod_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                # Remove other worker roots from sys.path to prevent cross-imports
+                sys.path = [p for p in sys.path if not ("Worker" in p and os.path.basename(p)[0].isdigit() and p != _mod_root)]
+                if sys.path[0] != _mod_root:
+                    sys.path.insert(0, _mod_root)
+                
+                # Unload cached 'op' modules so Python is forced to load the correct one from _mod_root
+                for k in list(sys.modules.keys()):
+                    if k.startswith("op.") or k == "op":
+                        del sys.modules[k]
 
                 # ── Route by rotina ──
                 if not rotina:
@@ -226,9 +261,13 @@ class UnimedAnopolisScraper(BaseScraper):
                     from op.op1_consulta import execute as op1_execute
                     results = op1_execute(self, job_data)
                     
-                elif rotina in ("2", "captura"):
+                elif str(rotina).lower() in ("2", "captura"):
                     from op.op2_captura import execute as op2_execute
                     results = op2_execute(self, job_data)
+                    
+                elif str(rotina).lower() in ("execução", "execucao", "3"):
+                    from op.op3_execucao import execute as op3_execute
+                    results = op3_execute(self, job_data)
 
                 else:
                     raise NotImplementedError(

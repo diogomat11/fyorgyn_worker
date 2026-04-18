@@ -11,8 +11,11 @@ class ScraperFactory:
         worker_dir = os.path.dirname(os.path.abspath(__file__))
         
         if id_convenio == 6: # IPASGO
-             from ipasgo_wrapper import IpasgoScraper
-             return IpasgoScraper(id_convenio=id_convenio, db=db, headless=headless)
+             target_file = os.path.join(worker_dir, "6-ipasgo", "core", "scraper.py")
+             spec = importlib.util.spec_from_file_location("ipasgo_scraper", target_file)
+             ipasgo_module = importlib.util.module_from_spec(spec)
+             spec.loader.exec_module(ipasgo_module)
+             return ipasgo_module.IpasgoScraper(id_convenio=id_convenio, db=db, headless=headless)
              
         elif id_convenio == 2: # UNIMED ANAPOLIS
              target_file = os.path.join(worker_dir, "2-unimed_anapolis", "core", "scraper.py")

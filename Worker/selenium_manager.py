@@ -30,8 +30,19 @@ class SeleniumManager:
 
             # 2. Check pool capacity
             if len(self.drivers) >= self.max_drivers:
-                # Try to evict the oldest idle driver
-                self._evict_oldest()
+                # Try to repurpose the oldest idle driver instead of evicting and closing it
+                oldest_cid = min(self.last_activity, key=self.last_activity.get)
+                driver = self.drivers[oldest_cid]
+                if self._is_alive(driver):
+                    print(f">>> Repurposing oldest driver (Convenio {oldest_cid}) for Convenio {id_convenio}.")
+                    del self.drivers[oldest_cid]
+                    del self.last_activity[oldest_cid]
+                    
+                    self.drivers[id_convenio] = driver
+                    self.last_activity[id_convenio] = datetime.now()
+                    return driver
+                else:
+                    self.close_driver(oldest_cid)
 
             # 3. Create new driver
             print(f">>> Creating new driver for convenio {id_convenio}...")
@@ -46,6 +57,7 @@ class SeleniumManager:
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--kiosk-printing")
         if headless:
             chrome_options.add_argument("--headless")
         

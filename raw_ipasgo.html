@@ -1,0 +1,395 @@
+
+
+
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="PRAGMA" content="NO-CACHE" />
+    <meta http-equiv="CACHE-CONTROL" content="NO-CACHE" />
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="shortcut icon" href="/favicon.ico?v=0" />
+    <title>Logon | Portal Fácil</title>
+
+    <link href="/content/views/shared/_layout?v=IJpwzNzM9SePXfQWGusN4qXVfd8HdJilElUIJpa4HGY1" rel="stylesheet"/>
+<link href="/content/css-page?v=3glA35tTNQhbpp-DuxJhxqpJ_-kzqVUbWJq1Qe3MAyY1" rel="stylesheet"/>
+<link href="/content/theme/customized?v=SLBfW27qdkHtg4u0s7LyqH08LiMBLPYXZaWg72a5Hfw1" rel="stylesheet"/>
+
+
+    <script src="/bundles/views/shared/_layout?v=YWS0fO5N4K3OqhRUmljyrq5qBadgakH4kVJaiIKEGMk1"></script>
+
+
+    
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <link href="/content/views/logon?v=mc9UdDos7ipa9FaV91VmHD1p9JllaV4tQXlUaAZLSMM1" rel="stylesheet"/>
+
+
+
+
+                <link rel="stylesheet" type="text/css" href="https://ftcliente.chatverisys.com.br/Content/remote_interaction.css">
+            <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+            <style type="text/css">
+                #btn_interaction {
+                    z-index: 1031 !important;
+                }
+            </style>
+            <script id="remote-script" async="" src=https://ftcliente.chatverisys.com.br/Scripts/remote.interaction.widget.js?grupo=202006></script>
+
+</head>
+<body class="container-fluid">
+    <header>
+        <div id="mensagemGenerica" class="mensagem-generica">
+            <i class="fa fa-info-circle fa-fw" aria-hidden="true"></i>
+            <div class="mensagem-generica-texto">
+                <span id="spanTextoMensagemGenerica" style="margin-left: 3px; display:block;"></span>
+            </div>
+        </div>
+    </header>
+    <main id="main">
+
+
+        
+
+
+
+    <div id="divLogo" class="text-center">
+        <img class="logon-logo" src='/Content/Images/Logo Entrada.png' alt="LogoWebPlan" />
+    </div>
+
+<div class="logon-panel">
+    <div class="logonContainter logon-container">
+        <input data-val="true" data-val-required="O campo AutenticarBeneficiarioPorCPF é obrigatório." id="hAutenticarBeneficiarioPorCPF" name="AutenticarBeneficiarioPorCPF" type="hidden" value="False" />
+        <input data-val="true" data-val-required="O campo AutenticarViaWebService é obrigatório." id="hAutenticarViaWebService" name="AutenticarViaWebService" type="hidden" value="False" />
+        <input data-val="true" data-val-required="O campo GerarUsuarioPrimeiroAcesso é obrigatório." id="hGerarUsuarioPrimeiroAcesso" name="GerarUsuarioPrimeiroAcesso" type="hidden" value="False" />
+        <input data-val="true" data-val-required="O campo PermiteSalvarCredenciaisAcesso é obrigatório." id="hPermiteSalvarCredenciaisAcesso" name="PermiteSalvarCredenciaisAcesso" type="hidden" value="True" />
+        <input data-val="true" data-val-required="O campo RecaptchaHabilitar é obrigatório." id="hRecaptchaHabilitar" name="RecaptchaHabilitar" type="hidden" value="False" />
+
+
+
+<form action="/GuiasTISS/Logon/AuthenticateUser" data-ajax="true" data-ajax-method="POST" data-ajax-success="logonCallback" id="form0" method="post">            <table class="logon-table">
+                <tr>
+                    <td colspan="3">
+                        <h2>
+                            <span class="fa-stack fa-lg">
+                                <i class="fa fa-circle fa-fw fa-stack-2x" aria-hidden="true"></i>
+                                <i class="fa fa-lock fa-fw fa-stack-1x fa-inverse" aria-hidden="true"></i>
+                            </span>
+                            LOGON
+                        </h2>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="logon-label">Tipo de acesso:</td>
+                    <td class="logon-field">
+                        <select class="form-control logon-field-select" data-val="true" data-val-required="O campo TipoDeAcesso é obrigatório." hasfocus="tipoAcessoHasFocus" id="tipoAcesso" name="TipoDeAcesso"><option value="">-- Tipo de acesso --</option>
+<option value="99">Administrador</option>
+<option value="27">Atendente</option>
+<option value="20">Benefici&#225;rio</option>
+<option value="24">Empresa</option>
+<option value="21">M&#233;dico</option>
+<option value="21">Prestador PF</option>
+<option value="22">Prestador PJ</option>
+</select>
+                    </td>
+                    <td class="logon-field-alert"></td>
+                </tr>
+                <tr>
+                    <td class="logon-label">Usuário:</td>
+                    <td class="logon-field">
+                        <input type="text" id="login-entry" value="" class="elementInput logon-field-input" onchange="clearFields(false);" autocomplete="one-time-code" />
+                    </td>
+                    <td class="logon-field-alert"></td>
+                </tr>
+                <tr>
+                    <td class="logon-label" id="tdDescSenha">Senha:</td>
+                    <td class="logon-field">
+                        <input type="text" id="password-entry" class="elementInput logon-field-input" value="" onchange="clearFields(true);" autocomplete="one-time-code" />
+                    </td>
+                    <td class="logon-field-alert"></td>
+                </tr>
+                <tr id="divEsqueciMinhaSenha" class="esqueci-minha-senha">
+                    <td class="logon-label">E-mail:</td>
+                    <td class="logon-field">
+                        <div class="input-group">
+                            <input type="text" id="txtEmail" class="elementInput logon-field-input" onchange="clearFields(false);" style="height: 20px; width: 78% !important;" />
+                            <select class="form-control logon-field-select" id="emailsDisp" style="width: 78% !important;"></select>
+                            <span class="input-group-btn">
+                                <button type="button" class="btn btn-primary btn-sm btn-block logon-field-button" onclick="doEsqueciMinhaSenha()" style="width: 20% !important;">Enviar</button>
+                            </span>
+                        </div>
+                    </td>
+                    <td class="logon-field-alert"></td>
+                </tr>
+                <tr>
+                    <td class="logon-label"></td>
+                    <td class="logon-field">
+                        <a href="#" onclick="exibirEsqueciMinhaSenha()">Esqueci minha senha</a>
+                        <span id="spanPrimeiroAcesso">
+                            |&nbsp;<a href="#" onclick="exibirPrimeiroAcesso()">Primeiro acesso</a>
+                        </span>
+                    </td>
+                    <td class="logon-field-alert"></td>
+                </tr>
+
+
+                <tr>
+                    <td class="logon-label"></td>
+                    <td class="logon-field">
+                        <hr />
+                        <button type="button" class="btn btn-primary btn-sm btn-block logon-field-button" id="BtnEntrar" onclick="doLogon();">Entrar</button>
+                    </td>
+                    <td class="logon-field-alert"></td>
+                </tr>
+
+                <tr>
+                    <td class="logon-label"></td>
+                    <td class="logon-field logon-field-validate-info" id="SummaryValidator">
+                        <ul>
+                            <li id="validatorTipoAcesso" class="logon-field-validate-alert">Selecione o tipo de acesso</li>
+                            <li id="validatorLogin" class="logon-field-validate-alert">Informe o login</li>
+                            <li id="validatorSenha" class="logon-field-validate-alert">Informe a senha</li>
+                            <li id="validatorRecaptcha" class="logon-field-validate-alert">Informe a validação de segurança</li>
+                            <li id="validatorAutenticacao" class="logon-field-validate-alert">Usuário ou senha inválida</li>
+                            <li id="validatorUsuarioCancelado" class="logon-field-validate-alert">Usuário cancelado</li>
+                            <li id="validatorPrestadorNaoCredenciado" class="logon-field-validate-alert">Prestador não credenciado</li>
+                            <li id="validatorEmail" class="logon-field-validate-alert">Informe o e-mail</li>
+                            <li id="validatorErroGenerico" class="logon-field-validate-alert"></li>
+                            <li id="validatorEmailCheck" class="logon-field-validate-alert">E-mail inválido</li>
+                            <li id="validatorSenhaBloqueada" class="logon-field-validate-alert">Senha bloqueada. Tente novamente em alguns minutos</li>
+                            <li id="validatorSemAcessoHomol" class="logon-field-validate-alert">Usuário não possui acesso ao banco de homologação</li>
+                            <li id="validatorMensagemErroBeneficiarioAdesaoNaoVingente" class="logon-field-validate-alert"></li>
+                            <li id="validatorFaceb" class="logon-field-validate-alert"></li>
+                            <li id="validatorTrocaEmail" class="logon-field-validate-alert"></li>
+                            <li id="validatorColarCopiarRecortar" class="logon-field-validate-alert"></li>
+                            <li id="validatorErroAuthenticateUser" class="logon-field-validate-alert"></li>
+                            <li id="validatorAtendimentoCancelado" class="logon-field-validate-alert">O atendimento a sua empresa foi cancelado. Entre em contato com o Grupo Fácil.</li>
+                        </ul>
+                    </td>
+                    <td class="logon-field-alert"></td>
+                </tr>
+                <tr>
+                    <td class="logon-label"></td>
+                    <td class="logon-field logon-field-validate-info" id="divMessagemSenhaTrocada">
+                        <i class="fa fa-info-circle fa-lg" aria-hidden="true"></i>
+                        <label>Senha trocada e enviada ao e-mail informado.</label>
+                    </td>
+                    <td class="logon-field-alert"></td>
+                </tr>
+            </table>
+</form>    </div>
+
+        <div class="logonContainter logon-container">
+            <table class="logon-table">
+                <tr>
+                    <td>
+                        <strong>
+                            <div style="text-align: center;"><span style="background-color: rgb(255, 0, 0);"><div style=""><span style="background-color: rgb(255, 255, 255);"><span style="background-color: rgb(255, 0, 0); font-size: 24px;"><font color="#ff0000" style=""><div style=""><div style="font-weight: 400; color: rgb(0, 0, 0); font-size: 12px;"><br></div></div><div style="font-weight: bold;"><span style="font-size: 14px;">Prezados Prestadores,</span></div><div style="font-weight: bold;"><span style="font-size: 14px;">Comunicamos que, para o envio do XML referente aos atendimentos liberados até a data de 31 de julho de 2024, serão aceitos os arquivos com os códigos da tabela própria IPASGO.</span></div><div style="font-weight: bold;"><span style="font-size: 14px;">A partir dessa data, será obrigatória a utilização da codificação TUSS para o envio de todos arquivos, conforme as diretrizes estabelecidas pela ANS.</span></div><div style="font-weight: bold;"><span style="font-size: 14px;">Agradecemos pela atenção e colaboração de todos.</span></div><div style="font-weight: bold;"><span style="font-size: 14px;">Atenciosamente,</span></div></font></span></span></div><div style="font-size: 24px; font-weight: bold;"><b style="background-color: rgb(255, 255, 255); font-size: 12px;"><span style="font-size: 24px; background-color: rgb(255, 0, 0);"><br></span></b></div><div style="font-size: 24px; font-weight: bold;"><b style="background-color: rgb(255, 255, 255); font-size: 12px;"><span style="font-size: 14px; background-color: rgb(255, 0, 0);">ATENÇÃO !!</span></b><br></div></span></div><div style="text-align: center;"><b><span style="font-size: 18px; background-color: rgb(255, 0, 0);"><br></span></b></div><div style="text-align: center;"><span style="font-size: 14px;">Prezado credenciado, como já praticado nos atendimentos, lembre-se de utilizar o cartão magnético no leitor para identificação do beneficiário. </span></div><div style="text-align: center;"><span style="font-size: 14px;">Para aqueles que utilizam a carteirinha digital, lembre-se de solicitar o token quando o sistema pedir esta informação.</span></div><div style="text-align: center;"><span style="font-size: 14px;">Beneficiários que possuem a carteira provisória não serão solicitados a informar o Token , pois possuem um tratamento de segurança de liberação apartada.</span></div><div style="text-align: center;"><span style="font-size: 14px;">Caso seja necessário digitar a carteirinha na guia e o beneficiário não possua o aplicativo no celular, contacte a central do prestador para que seja possível obter o token de autorização.</span></div><div style="text-align: center;"><span style="font-size: 14px;"><br></span></div><div style="text-align: center;"><span style="font-size: 14px; background-color: rgb(214, 239, 214);"><font color="#ff0000"><b>COMUNICADO IMPORTANTE PARA PRESTADORES PJ - PAGAMENTO DA REFERÊNCIA 10/2024</b></font></span></div><div style="text-align: center;"><span style="font-size: 14px;"><br></span></div><div style="text-align: center;"><div style=""><span style="font-size: 14px;">Prezado Prestador,</span></div><div style=""><span style="font-size: 14px;"><br></span></div><div style=""><div><span style="font-size: 14px;">Retificamos o e-mail enviado em 28/11/2024 com o assunto: "Solicitação de envio de Nota Fiscal de Fatura".</span></div><div><br></div><div><br></div><div><span style="font-size: 14px;">Informamos que as faturas referentes à competência 10/2024 estão disponíveis para consulta, favor acessar o Portal para anexar a Nota Fiscal. Com relação aos valores glosados, eventuais recursos podem ser apresentados para análise por meio do portal a partir do dia 10/12/2024.</span></div><div><br></div><div><br></div><div><span style="font-size: 14px;">Para quaisquer dúvidas ou esclarecimentos, nossa Central de Atendimento ao Prestador está à disposição para atendê-lo.</span></div><div><br></div></div><div style=""><span style="font-size: 14px;">Contamos com sua compreensão e nos colocamos à disposição para eventuais esclarecimentos.</span></div></div>
+                        </strong>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+
+        <div class="logon-version">
+            <span>@2026 F&#225;cil Inform&#225;tica - FacPlan Novo WebPlan - Vers&#227;o 1.1.621.1</span>
+        </div>
+</div>
+
+
+
+
+    </main>
+    <footer>
+    </footer>
+
+    <script type="text/html" id="fields-beneficiario">
+    <div data-bind="with: item">
+        <!-- ko if: isVisible-->
+        <div class="col-md-6 form-group" data-bind="validationElement: codigo, css:{'col-md-1': tamanho() == 1, 'col-md-2': tamanho() == 2, 'col-md-3': tamanho() == 3,'col-md-4': tamanho() == 4,'col-md-5': tamanho() == 5,'col-md-6': tamanho() == 6,'col-md-7': tamanho() == 7,'col-md-8': tamanho() == 8,'col-md-9': tamanho() == 9,'col-md-10': tamanho() == 10,'col-md-11': tamanho() == 11,'col-md-12': tamanho() == 12}">
+            <label class="control-label" data-bind="text: lable"></label><span class="required-bullet" data-bind="visible: obrigatorio()"> *</span>
+            <div class="input-group">
+                <input type="text" class="form-control small ui-autocomplete-input" data-bind="disable: readOnly, attr:{id: idElement }, value: nome, valueUpdate: 'afterkeydown'">
+                <span class="input-group-addon small" id="basic-addon1"><i class="fa fa-search"></i></span>
+            </div>
+        </div>
+        <!-- /ko-->
+    </div>
+</script>
+
+<script type="text/html" id="fields-prestador">
+    <div data-bind="with: item">
+        <div class="col-md-6 form-group" data-bind="validationElement: codigo, css:{'col-md-1': tamanho() == 1, 'col-md-2': tamanho() == 2, 'col-md-3': tamanho() == 3,'col-md-4': tamanho() == 4,'col-md-5': tamanho() == 5,'col-md-6': tamanho() == 6,'col-md-7': tamanho() == 7,'col-md-8': tamanho() == 8,'col-md-9': tamanho() == 9,'col-md-10': tamanho() == 10,'col-md-11': tamanho() == 11,'col-md-12': tamanho() == 12}">
+            <label class="control-label" data-bind="text: lable"></label><span class="required-bullet" data-bind="visible: obrigatorio()"> *</span>
+            <div class="input-group">
+                <input type="text" class="form-control small ui-autocomplete-input" data-bind="disable: readOnly, attr:{id: idElement }, value: nome, valueUpdate: 'afterkeydown'">
+                <span class="input-group-addon small" id="basic-addon1"><i class="fa fa-search"></i></span>
+            </div>
+        </div>
+    </div>
+</script>
+
+<script type="text/html" id="fields-select-generic">
+    <div data-bind="with: item">
+        <!-- ko if: isVisible-->
+        <div class="col-md-6 form-group" data-bind="validationElement: codigo, css:{'mb-1': !exibirLabel() ,'col-md-1': tamanho() == 1, 'col-md-2': tamanho() == 2, 'col-md-3': tamanho() == 3,'col-md-4': tamanho() == 4,'col-md-5': tamanho() == 5,'col-md-6': tamanho() == 6,'col-md-7': tamanho() == 7,'col-md-8': tamanho() == 8,'col-md-9': tamanho() == 9,'col-md-10': tamanho() == 10,'col-md-11': tamanho() == 11,'col-md-12': tamanho() == 12}">
+            <label class="control-label" data-bind="text: lable, visible: exibirLabel"></label><span class="required-bullet" data-bind="visible: obrigatorio() && exibirLabel()"> *</span>
+            <div class="input-group">
+                <input type="text" class="form-control small ui-autocomplete-input" data-bind="disable: readOnly, attr:{id: idElement, name: nameAttr, tabindex: tabIndex}, value: nome, valueUpdate: 'afterkeydown'">
+                <span class="input-group-addon small" id="basic-addon1"><i class="fa fa-search"></i></span>
+            </div>
+        </div>
+        <!-- /ko-->
+    </div>
+</script>
+
+<script type="text/html" id="fields-select-generic-form-group-bordered">
+    <div class="form-group form-group-bordered" data-bind="validationElement: item.codigo, css:{'col-md-1': item.tamanho() == 1, 'col-md-2': item.tamanho() == 2, 'col-md-3': item.tamanho() == 3,'col-md-4': item.tamanho() == 4,'col-md-5': item.tamanho() == 5,'col-md-6': item.tamanho() == 6,'col-md-7': item.tamanho() == 7,'col-md-8': item.tamanho() == 8,'col-md-9': item.tamanho() == 9,'col-md-12': item.tamanho() == 12}">
+        <label class="control-label" data-bind="text: item.lable"></label><span class="required-bullet" data-bind="visible: item.obrigatorio()"> *</span>
+        <input type="text" class="form-control small ui-autocomplete-input" data-bind="disable: item.readOnly, attr:{id: item.idElement }, value: item.nome, valueUpdate: 'afterkeydown'">
+    </div>
+</script>
+
+<script type="text/html" id="fields-select-generic-simple">
+    <label class="control-label" data-bind="text: item.lable"></label><span class="required-bullet" data-bind="visible: item.obrigatorio()"> *</span>
+    <input type="text" class="form-control small ui-autocomplete-input" data-bind="disable: item.readOnly, attr:{id: item.idElement }, value: item.nome, valueUpdate: 'afterkeydown'">
+</script>
+
+<script type="text/html" id="fields-chebox-inline">
+    <div data-bind="with: item">
+        <div class="col-md-6" style="padding-right:3px;" data-bind="validationElement: value, css:{'col-md-1': tamanho == 1, 'col-md-2': tamanho == 2, 'col-md-3': tamanho == 3,'col-md-4': tamanho == 4,'col-md-5': tamanho == 5,'col-md-6': tamanho == 6,'col-md-7': tamanho == 7,'col-md-8': tamanho == 8,'col-md-9': tamanho == 9,'col-md-10': tamanho == 10,'col-md-11': tamanho == 11,'col-md-12': tamanho == 12}">
+            <div class="checkbox-inline">
+                <label>
+                    <input type="checkbox" data-bind="checked: value"><span style="vertical-align: sub;" data-bind="text:texto"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+</script>
+<script type="text/html" id="fields-chebox-inline-lable">
+    <div data-bind="with: item">
+        <div class="col-md-6" style="padding-left:3px; padding-right:3px;" data-bind="validationElement: value, css:{'col-md-1': tamanho == 1, 'col-md-2': tamanho == 2, 'col-md-3': tamanho == 3,'col-md-4': tamanho == 4,'col-md-5': tamanho == 5,'col-md-6': tamanho == 6,'col-md-7': tamanho == 7,'col-md-8': tamanho == 8,'col-md-9': tamanho == 9,'col-md-10': tamanho == 10,'col-md-11': tamanho == 11,'col-md-12': tamanho == 12}">
+            <label style="color:white; display:block">.</label>
+            <div class="checkbox-inline">
+                <label>
+                    <input type="checkbox" data-bind="checked: value"><span style="vertical-align: sub;" data-bind="text:texto"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+</script>
+
+<script type="text/html" id="fields-chebox-inline-lable-enable">
+    <div data-bind="with: item">
+        <div class="col-md-6" style="padding-left:3px; padding-right:3px;" data-bind="validationElement: value, css:{'col-md-1': tamanho == 1, 'col-md-2': tamanho == 2, 'col-md-3': tamanho == 3,'col-md-4': tamanho == 4,'col-md-5': tamanho == 5,'col-md-6': tamanho == 6,'col-md-7': tamanho == 7,'col-md-8': tamanho == 8,'col-md-9': tamanho == 9,'col-md-10': tamanho == 10,'col-md-11': tamanho == 11,'col-md-12': tamanho == 12}">
+            <label style="color:white; display:block">.</label>
+            <div class="checkbox-inline">
+                <label>
+                    <input type="checkbox" data-bind="checked: value, enable: enable"><span style="vertical-align: sub;" data-bind="text:texto"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+</script>
+
+<script type="text/html" id="fields-chebox-inline-lable-attr">
+    <div data-bind="with: item">
+        <div class="col-md-6" style="padding-left:3px; padding-right:3px;" data-bind="validationElement: value, css:{'col-md-1': tamanho == 1, 'col-md-2': tamanho == 2, 'col-md-3': tamanho == 3,'col-md-4': tamanho == 4,'col-md-5': tamanho == 5,'col-md-6': tamanho == 6,'col-md-7': tamanho == 7,'col-md-8': tamanho == 8,'col-md-9': tamanho == 9,'col-md-10': tamanho == 10,'col-md-11': tamanho == 11,'col-md-12': tamanho == 12}">
+            <label style="color:white; display:block">.</label>
+            <div class="checkbox-inline">
+                <label>
+                    <input type="checkbox" data-bind="checked: value, attr:{name:name, tabindex: tabindex}"><span style="vertical-align: sub;" data-bind="text:texto"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+</script>
+
+<script type="text/html" id="list-errors">
+    <!--ko if: !validacao.isValid()-->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="alert alert-danger mb-0">
+                <strong>Inconsistências!</strong>
+                <ul class="row">
+                    <!-- ko foreach: validacao.errors()-->
+                    <li class="col-md-6" data-bind="text: $data"></li>
+                    <!-- /ko -->
+                </ul>
+            </div>
+        </div>
+    </div>
+    <!--/ko-->
+</script>
+
+<script type="text/html" id="template-paginacao">
+    <div class="row">
+        <div class="" data-bind="css:{'col-md-6-5':exibirItensPagina(), 'col-md-12':!exibirItensPagina()}">
+            <div class="form-group">
+                <nav class="" data-bind="css:{'text-right':exibirItensPagina(), 'text-center':!exibirItensPagina()}">
+                    <ul class="pagination pagination-sm">
+                        <li>
+                            <a href="#" aria-label="ant" data-bind="click: changePage.bind($data, 1)">
+                                <span aria-hidden="true">&laquo;</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" aria-label="ant" data-bind="click: changePage.bind($data, page() - 1)">
+                                <span aria-hidden="true">&lt;</span>
+                            </a>
+                        </li>
+                        <!-- ko foreach: filteredPages -->
+                        <li data-bind="css: { active: $parent.page() == $data }">
+                            <a href="#" data-bind="click: $parent.changePage">
+                                <span data-bind="text: $data"></span>
+                            </a>
+                        </li>
+                        <!-- /ko -->
+                        <li>
+                            <a href="#" aria-label="prox" data-bind="click: changePage.bind($data, page() + 1)">
+                                <span aria-hidden="true">&gt;</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" aria-label="prox" data-bind="click: changePage.bind($data, pages().length)">
+                                <span aria-hidden="true">&raquo;</span>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+                <img data-bind="visible: isLoading" src="/Content/Images/loading_blue.gif" alt="carregando..." style="width: 12px; margin-top:30px;" />
+            </div>
+        </div>
+        <!-- ko if: exibirItensPagina -->
+        <div class="col-md-4 pl-0">
+            <div class="row">
+                <div class="col-md-4 form-group">
+                    <label class="control-label text-left">Itens por página:</label>
+                    <select class="form-control selectItensPorPagina" data-bind="options: optsQtdePorPagina,value:qtdItensPagina, event:{ change: reloadPage}"></select>
+                </div>
+            </div>
+        </div>
+        <!-- /ko -->
+    </div>
+    <div class="row">
+        <div class="col-md-12">
+            <!-- ko if: mostrandoDeAte -->
+            <label style="width: 100%; text-align:center; color: gray;" data-bind="text: mostrandoDeAte"></label>
+            <!-- /ko -->
+        </div>
+    </div>
+</script>
+
+    <div class="loadingOverlay" id="divLoadingOverlay" style="display: none;"></div>
+
+    <script src="/bundles/js-page?v=EPhMscOx-Sh9yOJwkO-7SYLd0wgnntRwM2NZRSWANAs1"></script>
+
+    
+    <script src="/bundles/controllers/logon?v=f_MIy8V48ZhELrpMl-yRItNuZdDF4I0Mu-F8VccK0kk1"></script>
+
+
+</body>
+</html>

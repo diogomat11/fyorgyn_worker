@@ -24,8 +24,9 @@ class UnimedScraper(BaseScraper):
         super().__init__(id_convenio, db, headless)
         self.db = db
         
-        self.username = os.environ.get("SGUCARD_LOGIN", "REC2209525")
-        self.password = os.environ.get("SGUCARD_PASSWORD", "Unimed@2025")
+        # Credentials loaded exclusively from DB (convenios table)
+        self.username = None
+        self.password = None
         
         if self.id_convenio:
              self._load_credentials()
@@ -36,8 +37,15 @@ class UnimedScraper(BaseScraper):
             if conv and conv.usuario and conv.senha_criptografada:
                 self.username = conv.usuario
                 self.password = decrypt_password(conv.senha_criptografada)
+                print(f">>> [Goiania] Credentials loaded from DB for convenio {self.id_convenio}")
+            else:
+                msg = f"[Goiania] ERRO: Credenciais ausentes no banco para convenio {self.id_convenio}"
+                print(f">>> {msg}")
+                self.log(msg, level="ERROR")
         except Exception as e:
-            pass
+            msg = f"[Goiania] ERRO ao carregar credenciais do banco: {e}"
+            print(f">>> {msg}")
+            self.log(msg, level="ERROR")
 
     def log(self, message, level="INFO", job_id=None, carteirinha_id=None):
         print(f"[{level}] {message}")
@@ -114,6 +122,17 @@ class UnimedScraper(BaseScraper):
 
                 if not rotina: rotina = "1"
 
+                # ── Isolate Environment (Fix Crosstalk) ──
+                import sys, os
+                _mod_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                sys.path = [p for p in sys.path if not ("Worker" in p and os.path.basename(p)[0].isdigit() and p != _mod_root)]
+                if sys.path[0] != _mod_root:
+                    sys.path.insert(0, _mod_root)
+                
+                for k in list(sys.modules.keys()):
+                    if k.startswith("op.") or k == "op":
+                        del sys.modules[k]
+
                 if rotina in ("0", "op0", "login_test"):
                     from op.op0_login import execute as op0_execute
                     results = op0_execute(self, job_data)
@@ -129,6 +148,14 @@ class UnimedScraper(BaseScraper):
                         self.login()
 
                     results = op1_execute(self, job_data)
+                    
+                elif str(rotina).lower() == "captura":
+                    from op.op2_captura import execute as op2_execute
+                    results = op2_execute(self, job_data)
+                    
+                elif str(rotina).lower() in ("execução", "execucao", "3"):
+                    from op.op3_execucao import execute as op3_execute
+                    results = op3_execute(self, job_data)
                     
                 else:
                     raise NotImplementedError(f"Rotina '{rotina}' not implementada para Unimed Goiania")

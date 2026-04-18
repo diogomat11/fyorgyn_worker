@@ -110,7 +110,21 @@ def get_ranked_pending_jobs(db, limit=20):
             if r.rotina is not None and (r.id_convenio, None) not in rules_map:
                 rules_map[(r.id_convenio, None)] = r
         
-        pending_jobs = db.query(Job).filter(Job.status == "pending").limit(limit).all()
+        from sqlalchemy import or_
+        from sqlalchemy.orm import aliased
+        
+        ParentJob = aliased(Job)
+        
+        pending_jobs = db.query(Job).outerjoin(
+            ParentJob, Job.depending_id == ParentJob.id
+        ).filter(
+            Job.status == "pending",
+            or_(
+                Job.depending_id == None,
+                ParentJob.status == 'success'
+            )
+        ).limit(limit).all()
+        
         if not pending_jobs:
             return []
         
@@ -154,7 +168,35 @@ def retry_failed_jobs(db):
                 job.updated_at = datetime.utcnow()
             db.commit()
     except Exception as e:
-        logger.error(f"Error resetting failed jobs: {e}")
+        logger.error(f"Error retrying failed jobs: {e}")
+
+
+def cleanup_expired_captures(db):
+    try:
+        from datetime import datetime, timedelta
+        from models import BaseGuia, Convenio
+        
+        # 59 minutes timeout threshold
+        limit_time = datetime.utcnow() - timedelta(minutes=59)
+        
+        expired_guias = db.query(BaseGuia).join(
+            Convenio, BaseGuia.id_convenio == Convenio.id_convenio
+        ).filter(
+            Convenio.timeout_captura == True,
+            BaseGuia.timestamp_captura != None,
+            BaseGuia.timestamp_captura < limit_time
+        ).all()
+        
+        count = 0
+        for guia in expired_guias:
+            guia.timestamp_captura = None
+            count += 1
+            
+        if count > 0:
+            db.commit()
+            logger.info(f"Swept {count} guias exceeding the 59m timeout flag.")
+    except Exception as e:
+        logger.error(f"Error sweeping expired captures: {e}")
 
 def recover_stuck_jobs(db):
     try:
@@ -398,52 +440,81 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                     def parse_int_safe(val, default=0):
                         try:
                             clean = str(val).strip()
-                            if not clean: return default
+                            if not clean or clean.lower() in ["none", "null"]: return default
                             return int(clean)
                         except:
                             return default
+                            
+                    def parse_date_robust(date_str):
+                        if not date_str or not isinstance(date_str, str): return None
+                        clean = date_str.strip()[:10]
+                        try:
+                            if "-" in clean: return datetime.strptime(clean, "%Y-%m-%d").date()
+                            return datetime.strptime(clean, "%d/%m/%Y").date()
+                        except: return None
 
                     for item in results:
                         try:
-                            qtd_solic_val = parse_int_safe(item.get("qtde_solicitada"), 0)
-                            qtd_aut_val = parse_int_safe(item.get("qtde_autorizada"), 0)
-                            guia_num = str(item.get("numero_guia", "")).strip()
-                            data_auth_parsed = parse_date(item.get("data_autorizacao"))
-                            validade_parsed = parse_date(item.get("validade_senha"))
+                            qtd_solic_val = parse_int_safe(item.get("qtde_solicitada", item.get("qtde_solicitado")), 0)
+                            qtd_aut_val = parse_int_safe(item.get("qtde_autorizada", item.get("sessoes_autorizadas", item.get("qtde_autorizado"))), 0)
+                            guia_num = str(item.get("numero_guia", item.get("guia", ""))).strip()
+                            data_auth_parsed = parse_date_robust(item.get("data_autorizacao"))
+                            validade_parsed = parse_date_robust(item.get("validade_senha", item.get("data_validade")))
                             senha_val = str(item.get("senha", "")).strip() if item.get("senha") else None
+                            codigo_terapia_val = item.get("codigo_terapia", item.get("codigo_procedimento"))
+                            codigo_benef = item.get("codigo_beneficiario")
                             
-                            existing_guia = db.query(BaseGuia).filter(
-                                BaseGuia.carteirinha_id == carteirinha_id,
-                                BaseGuia.id_convenio == id_convenio,
-                                BaseGuia.guia == guia_num
-                            ).first()
+                            status_guia_val = str(item.get("status_guia", item.get("status", "Autorizado"))).strip()
                             
-                            status_guia_val = str(item.get("status_guia", "Autorizado")).strip()
+                            # Resolve dynamic Carteirinha ID for standalone jobs spanning full portal
+                            current_cid = carteirinha_id
+                            if not current_cid and codigo_benef:
+                                cart = db.query(Carteirinha).filter(Carteirinha.codigo_beneficiario == codigo_benef).first()
+                                if cart:
+                                    current_cid = cart.id
+
+                            existing_guia = None
+                            if current_cid:
+                                existing_guia = db.query(BaseGuia).filter(
+                                    BaseGuia.carteirinha_id == current_cid,
+                                    BaseGuia.id_convenio == id_convenio,
+                                    BaseGuia.guia == guia_num
+                                ).first()
+                            elif codigo_benef:
+                                existing_guia = db.query(BaseGuia).filter(
+                                    BaseGuia.codigo_beneficiario == codigo_benef,
+                                    BaseGuia.id_convenio == id_convenio,
+                                    BaseGuia.guia == guia_num
+                                ).first()
 
                             if existing_guia:
                                 existing_guia.data_autorizacao = data_auth_parsed
                                 existing_guia.senha = senha_val
                                 existing_guia.status_guia = status_guia_val
                                 existing_guia.validade = validade_parsed
-                                existing_guia.codigo_terapia = item.get("codigo_terapia")
+                                existing_guia.codigo_terapia = codigo_terapia_val
                                 existing_guia.qtde_solicitada = qtd_solic_val
                                 existing_guia.sessoes_autorizadas = qtd_aut_val
+                                if codigo_benef:
+                                    existing_guia.codigo_beneficiario = codigo_benef
+                                if current_cid and not existing_guia.carteirinha_id:
+                                    existing_guia.carteirinha_id = current_cid
                                 existing_guia.updated_at = datetime.utcnow()
                                 count_updated += 1
                             else:
-                                # Apenas guias AUTORIZADAS ou EM ESTUDO podem ser inseridas como novas
-                                if status_guia_val.upper() not in ["AUTORIZADO", "EM ESTUDO"]:
+                                if status_guia_val.upper() not in ["AUTORIZADO", "EM ESTUDO", "SOLICITADO", "EM AVALIAÇÃO", "EM APROVAÇÃO E AGUARDANDO P", "NEGADO", "CANCELADO"]:
                                     continue
                                 
                                 new_guia = BaseGuia(
                                     id_convenio=id_convenio,
-                                    carteirinha_id=carteirinha_id,
+                                    carteirinha_id=current_cid,
                                     guia=guia_num,
+                                    codigo_beneficiario=codigo_benef,
                                     data_autorizacao=data_auth_parsed,
                                     senha=senha_val,
                                     status_guia=status_guia_val,
                                     validade=validade_parsed,
-                                    codigo_terapia=item.get("codigo_terapia"),
+                                    codigo_terapia=codigo_terapia_val,
                                     qtde_solicitada=qtd_solic_val,
                                     sessoes_autorizadas=qtd_aut_val,
                                     created_at=datetime.utcnow()
@@ -454,6 +525,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                             import traceback
                             trace_str = traceback.format_exc()
                             logger.error(f"Error processing item: {item_e}\n{trace_str}")
+                            db.rollback()
                             db.add(Log(
                                 job_id=job_id, 
                                 carteirinha_id=carteirinha_id, 
@@ -513,9 +585,10 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
     while True:
         db = SessionLocal()
         try:
-            # 0. Retry failed jobs & sweep dead processing jobs
+            # 0. Retry failed jobs, sweep dead processing jobs & expired captures
             retry_failed_jobs(db)
             recover_stuck_jobs(db)
+            cleanup_expired_captures(db)
 
             # 1. Check available servers
             available_servers = []
@@ -634,8 +707,8 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                         # Mark job + server as taken
                         locked_job.status = "processing"
                         locked_job.locked_by = server_url
-                        locked_job.attempts += 1
-                        locked_job.updated_at = datetime.now(locked_job.created_at.tzinfo) if locked_job.created_at.tzinfo else datetime.utcnow()
+                        locked_job.attempts = (locked_job.attempts or 0) + 1
+                        locked_job.updated_at = datetime.now(locked_job.created_at.tzinfo) if (locked_job.created_at and locked_job.created_at.tzinfo) else datetime.utcnow()
                         db.commit()
 
                         print(f"Assigning Job {locked_job.id} (conv={locked_job.id_convenio}) "
@@ -652,7 +725,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                     # Spawn thread to call worker server
                     t = threading.Thread(
                         target=call_server,
-                        args=(server_url, locked_job.id, locked_job.carteirinha_rel.carteirinha,
+                        args=(server_url, locked_job.id, locked_job.carteirinha_rel.carteirinha if locked_job.carteirinha_rel else "",
                               locked_job.carteirinha_id, locked_job.id_convenio,
                               locked_job.rotina, locked_job.params, server_status_map)
                     )

@@ -14,14 +14,14 @@ from config.constants import DEFAULT_TIMEOUT
 
 def run(scraper, job_data):
     """
-    OP10 - Recurso Glosa - IPASGO
-    Objetivo: Automatizar o fluxo de pedido de recurso para guias glosadas.
+    OP8 - Check Facplan - IPASGO
+    Objetivo: Consolidar conferência no antigo/novo sistema de planilhas de faturamento Facplan.
     """
     driver = scraper.driver
     job_id = job_data.get("job_id")
-    scraper.log("OP10 - Recurso Glosa iniciado", job_id=job_id)
+    scraper.log("OP8 - Check Facplan iniciado", job_id=job_id)
     
-    # Lógica de entrada de recursos no portal
-    scraper.log("OP10 - Fluxo de glosa em fase de mapeamento de elementos", level="WARN", job_id=job_id)
+    # Lógica de conferência de matrizes e planilhas
+    scraper.log("OP8 - Integração com planilhas pendente", level="WARN", job_id=job_id)
     
-    return {"status": "boilerplate", "op": "op10"}
+    return {"status": "boilerplate", "op": "op8"}

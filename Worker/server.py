@@ -42,14 +42,15 @@ app = FastAPI(lifespan=lifespan)
 
 from typing import Optional, Any
 import json as _json
+import traceback
 
 class JobRequest(BaseModel):
     job_id: int
     id_convenio: int
     rotina: Optional[str] = None
     params: Optional[Any] = None  # Accept str or dict
-    carteirinha_id: int
-    carteirinha: str
+    carteirinha_id: Optional[int] = None
+    carteirinha: Optional[str] = None
     paciente: str = ""
     start_date: str = None
     end_date: str = None
@@ -122,6 +123,7 @@ def process_job(job: JobRequest):
         
     except Exception as e:
         print(f"Error processing job: {e}")
+        traceback.print_exc()
         return {"status": "error", "message": str(e), "job_id": job.job_id}
     finally:
         if db:

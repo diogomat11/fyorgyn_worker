@@ -35,7 +35,7 @@ engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     poolclass=NullPool,
     pool_pre_ping=True,
-    connect_args={"prepare_threshold": None}
+    connect_args={"prepare_threshold": None, "sslmode": "require"}
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

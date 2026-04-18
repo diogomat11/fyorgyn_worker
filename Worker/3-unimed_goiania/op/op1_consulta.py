@@ -34,22 +34,6 @@ def execute(scraper, job_data):
         except NoSuchElementException:
             return False
 
-    # Sort by Date (click header twice)
-    scraper.log("Sorting table by date (Clicking header twice)...", job_id=job_id, carteirinha_id=carteirinha_db_id)
-    try:
-        header_xpath = '//*[@id="conteudo-submenu"]/table[2]/tbody/tr[1]/td[1]/a'
-        if is_element_present(By.XPATH, header_xpath):
-            scraper.driver.find_element(By.XPATH, header_xpath).click()
-            scraper.log("Clicked header once. Waiting 4s...", job_id=job_id, carteirinha_id=carteirinha_db_id)
-            time.sleep(4)
-            
-            scraper.driver.find_element(By.XPATH, header_xpath).click()
-            scraper.log("Clicked header twice. Waiting 2s...", job_id=job_id, carteirinha_id=carteirinha_db_id)
-            time.sleep(2)
-        else:
-            scraper.log("Sort header not found. Proceeding sem explicit sort.", level="WARNING", job_id=job_id, carteirinha_id=carteirinha_db_id)
-    except Exception as sort_e:
-        scraper.log(f"Error while sorting table: {sort_e}", level="ERROR", job_id=job_id, carteirinha_id=carteirinha_db_id)
 
     scraper.log("Starting scraping loop...", job_id=job_id, carteirinha_id=carteirinha_db_id)
     try:
@@ -106,6 +90,41 @@ def execute(scraper, job_data):
          scraper.driver.close()
          scraper.driver.switch_to.window(scraper.driver.window_handles[0])
          return []
+
+    # Sort by Date (click header twice)
+    scraper.log("Sorting table by date (Clicking header twice)...", job_id=job_id, carteirinha_id=carteirinha_db_id)
+    try:
+        xpath_headers = '//*[@id="conteudo-submenu"]/table[2]//th | //*[@id="conteudo-submenu"]/table[2]//tr[1]/td | //*[@id="conteudo-submenu"]/table[2]//tr[2]/td'
+        header_elems = scraper.driver.find_elements(By.XPATH, xpath_headers)
+        clicked = False
+        for el in header_elems:
+            if "SOLICITA" in el.text.upper() or "DATA" in el.text.upper():
+                scraper.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", el)
+                links = el.find_elements(By.TAG_NAME, "a")
+                target = links[0] if links else el
+                
+                scraper.log(f"Clicando para classificar na coluna: {el.text}", job_id=job_id, carteirinha_id=carteirinha_db_id)
+                target.click()
+                time.sleep(4)
+                clicked = True
+                break
+                
+        if clicked:
+            # Re-find after first click (prevent Stale Element if POSTBACK occurred)
+            header_elems = scraper.driver.find_elements(By.XPATH, xpath_headers)
+            for el in header_elems:
+                if "SOLICITA" in el.text.upper() or "DATA" in el.text.upper():
+                    links = el.find_elements(By.TAG_NAME, "a")
+                    target = links[0] if links else el
+                    target.click()
+                    time.sleep(3)
+                    scraper.log("Segundo clique (Decrescente) aplicado.", job_id=job_id, carteirinha_id=carteirinha_db_id)
+                    break
+        else:
+            scraper.log("Aviso: Coluna SOLICITAÇÃO não encontrada para classificar.", level="WARN", job_id=job_id, carteirinha_id=carteirinha_db_id)
+            
+    except Exception as sort_e:
+        scraper.log(f"Error while sorting table: {sort_e}", level="ERROR", job_id=job_id, carteirinha_id=carteirinha_db_id)
 
     collected_data = [] 
 
