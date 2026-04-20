@@ -3,7 +3,7 @@ import os
 import time
 import requests
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 import socket
@@ -82,7 +82,7 @@ def calculate_effective_priority(job, rules_map):
     escalation = getattr(rule, 'escalation_minutes', 10) or 10
     
     try:
-        now = datetime.now(job.created_at.tzinfo) if job.created_at and job.created_at.tzinfo else datetime.utcnow()
+        now = datetime.now(job.created_at.tzinfo) if job.created_at and job.created_at.tzinfo else datetime.now(timezone.utc)
         if job.created_at:
             age_minutes = (now - job.created_at).total_seconds() / 60.0
         else:
@@ -129,7 +129,7 @@ def get_ranked_pending_jobs(db, limit=20):
             return []
         
         # effective_priority ASC (0 first), then created_at ASC
-        scored_jobs = [(calculate_effective_priority(j, rules_map), j.created_at or datetime.utcnow(), j)
+        scored_jobs = [(calculate_effective_priority(j, rules_map), j.created_at or datetime.now(timezone.utc), j)
                        for j in pending_jobs]
         scored_jobs.sort(key=lambda x: (x[0], x[1]))
         return [j for _, _, j in scored_jobs]
@@ -149,11 +149,11 @@ def get_pending_job(db, allowed_convenio_ids=None):
 
 def retry_failed_jobs(db):
     try:
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         # Check for jobs with status='error' and attempts < 3.
         # We explicitly IGNORE locked_by here, because if they are in 'error', the lock is a ghost.
         # Add a 20s cooldown so rapid failures don't instantly loop the queue
-        threshold = datetime.utcnow() - timedelta(seconds=20)
+        threshold = datetime.now(timezone.utc) - timedelta(seconds=20)
         failed_jobs = db.query(Job).filter(
             Job.status == "error",
             Job.attempts < 3,
@@ -165,7 +165,7 @@ def retry_failed_jobs(db):
             for job in failed_jobs:
                 job.status = "pending"
                 job.locked_by = None
-                job.updated_at = datetime.utcnow()
+                job.updated_at = datetime.now(timezone.utc)
             db.commit()
     except Exception as e:
         logger.error(f"Error retrying failed jobs: {e}")
@@ -173,11 +173,11 @@ def retry_failed_jobs(db):
 
 def cleanup_expired_captures(db):
     try:
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         from models import BaseGuia, Convenio
         
         # 59 minutes timeout threshold
-        limit_time = datetime.utcnow() - timedelta(minutes=59)
+        limit_time = datetime.now(timezone.utc) - timedelta(minutes=59)
         
         expired_guias = db.query(BaseGuia).join(
             Convenio, BaseGuia.id_convenio == Convenio.id_convenio
@@ -204,7 +204,7 @@ def recover_stuck_jobs(db):
         # If a job is 'processing' for more than 15 minutes, the Generic Worker thread 
         # or Chrome must have entirely died (e.g. OOM Kills, MaxClients crashes) without 
         # reaching the final block to unlock it.
-        threshold = datetime.utcnow() - timedelta(minutes=15)
+        threshold = datetime.now(timezone.utc) - timedelta(minutes=15)
         stuck_jobs = db.query(Job).filter(
             Job.status == "processing",
             Job.updated_at < threshold
@@ -215,7 +215,7 @@ def recover_stuck_jobs(db):
             for job in stuck_jobs:
                 job.status = "error" if job.attempts >= 3 else "pending"
                 job.locked_by = None
-                job.updated_at = datetime.utcnow()
+                job.updated_at = datetime.now(timezone.utc)
             db.commit()
     except Exception as e:
         logger.error(f"Error recovering stuck jobs: {e}")
@@ -418,14 +418,14 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 current_job.locked_by = None
                 current_job.attempts = max(0, current_job.attempts - 1) # Refund the attempt
                 db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, level="WARN", message="Worker Port returned 409 Busy -> Retornando Job para fila Pending."))
-                current_job.updated_at = datetime.utcnow()
+                current_job.updated_at = datetime.now(timezone.utc)
                 db.commit()
                 return
 
             if data.get("status") == "success":
                 current_job.status = "success"
                 current_job.locked_by = None
-                current_job.updated_at = datetime.utcnow()
+                current_job.updated_at = datetime.now(timezone.utc)
                 results = data.get("data", [])
                 
                 try:
@@ -459,9 +459,10 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                             qtd_aut_val = parse_int_safe(item.get("qtde_autorizada", item.get("sessoes_autorizadas", item.get("qtde_autorizado"))), 0)
                             guia_num = str(item.get("numero_guia", item.get("guia", ""))).strip()
                             data_auth_parsed = parse_date_robust(item.get("data_autorizacao"))
-                            validade_parsed = parse_date_robust(item.get("validade_senha", item.get("data_validade")))
+                            validade_parsed = parse_date_robust(item.get("validade_senha", item.get("data_validade", item.get("validade"))))
                             senha_val = str(item.get("senha", "")).strip() if item.get("senha") else None
                             codigo_terapia_val = item.get("codigo_terapia", item.get("codigo_procedimento"))
+                            nome_terapia_val = item.get("nome_terapia")
                             codigo_benef = item.get("codigo_beneficiario")
                             
                             status_guia_val = str(item.get("status_guia", item.get("status", "Autorizado"))).strip()
@@ -473,19 +474,46 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                                 if cart:
                                     current_cid = cart.id
 
+                            # ── Busca em 2 fases para evitar duplicatas ──
                             existing_guia = None
+                            
+                            # Fase 1: Match exato (guia + codigo_terapia + owner)
                             if current_cid:
-                                existing_guia = db.query(BaseGuia).filter(
+                                filters = [
                                     BaseGuia.carteirinha_id == current_cid,
                                     BaseGuia.id_convenio == id_convenio,
                                     BaseGuia.guia == guia_num
-                                ).first()
+                                ]
+                                if codigo_terapia_val:
+                                    filters.append(BaseGuia.codigo_terapia == codigo_terapia_val)
+                                existing_guia = db.query(BaseGuia).filter(*filters).first()
                             elif codigo_benef:
-                                existing_guia = db.query(BaseGuia).filter(
+                                filters = [
                                     BaseGuia.codigo_beneficiario == codigo_benef,
                                     BaseGuia.id_convenio == id_convenio,
                                     BaseGuia.guia == guia_num
-                                ).first()
+                                ]
+                                if codigo_terapia_val:
+                                    filters.append(BaseGuia.codigo_terapia == codigo_terapia_val)
+                                existing_guia = db.query(BaseGuia).filter(*filters).first()
+                            
+                            # Fase 2: Fallback — buscar com codigo_terapia NULL/vazio
+                            # (registros criados por OP3 que não tinham o código)
+                            if not existing_guia and codigo_terapia_val:
+                                from sqlalchemy import or_
+                                fallback_filters = [
+                                    BaseGuia.id_convenio == id_convenio,
+                                    BaseGuia.guia == guia_num,
+                                    or_(
+                                        BaseGuia.codigo_terapia == None,
+                                        BaseGuia.codigo_terapia == ""
+                                    )
+                                ]
+                                if current_cid:
+                                    fallback_filters.append(BaseGuia.carteirinha_id == current_cid)
+                                elif codigo_benef:
+                                    fallback_filters.append(BaseGuia.codigo_beneficiario == codigo_benef)
+                                existing_guia = db.query(BaseGuia).filter(*fallback_filters).first()
 
                             if existing_guia:
                                 existing_guia.data_autorizacao = data_auth_parsed
@@ -495,11 +523,13 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                                 existing_guia.codigo_terapia = codigo_terapia_val
                                 existing_guia.qtde_solicitada = qtd_solic_val
                                 existing_guia.sessoes_autorizadas = qtd_aut_val
+                                if nome_terapia_val:
+                                    existing_guia.nome_terapia = nome_terapia_val
                                 if codigo_benef:
                                     existing_guia.codigo_beneficiario = codigo_benef
                                 if current_cid and not existing_guia.carteirinha_id:
                                     existing_guia.carteirinha_id = current_cid
-                                existing_guia.updated_at = datetime.utcnow()
+                                existing_guia.updated_at = datetime.now(timezone.utc)
                                 count_updated += 1
                             else:
                                 if status_guia_val.upper() not in ["AUTORIZADO", "EM ESTUDO", "SOLICITADO", "EM AVALIAÇÃO", "EM APROVAÇÃO E AGUARDANDO P", "NEGADO", "CANCELADO"]:
@@ -515,9 +545,10 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                                     status_guia=status_guia_val,
                                     validade=validade_parsed,
                                     codigo_terapia=codigo_terapia_val,
+                                    nome_terapia=nome_terapia_val,
                                     qtde_solicitada=qtd_solic_val,
                                     sessoes_autorizadas=qtd_aut_val,
-                                    created_at=datetime.utcnow()
+                                    created_at=datetime.now(timezone.utc)
                                 )
                                 db.add(new_guia)
                                 count_inserted += 1
@@ -545,7 +576,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
             else:
                 current_job.status = "error"
                 current_job.locked_by = None
-                current_job.updated_at = datetime.utcnow()
+                current_job.updated_at = datetime.now(timezone.utc)
                 err_msg = data.get("message") or data.get("detail") or "Unknown error from server"
                 
                 # Regra de Negócio PO: Interromper Retentativas para erros Fatais (Carteira Inválida)
@@ -563,7 +594,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 if current_job:
                     current_job.status = "error"
                     current_job.locked_by = None
-                    current_job.updated_at = datetime.utcnow()
+                    current_job.updated_at = datetime.now(timezone.utc)
                     db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, level="ERROR", message="Worker is Offline (Connection Refused)."))
                     db.commit()
             except: pass
@@ -574,7 +605,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 if current_job:
                     current_job.status = "error"
                     current_job.locked_by = None
-                    current_job.updated_at = datetime.utcnow()
+                    current_job.updated_at = datetime.now(timezone.utc)
                     db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, level="ERROR", message=f"Dispatcher Failed: {str(e)}"))
                     db.commit()
             except: pass
@@ -708,7 +739,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                         locked_job.status = "processing"
                         locked_job.locked_by = server_url
                         locked_job.attempts = (locked_job.attempts or 0) + 1
-                        locked_job.updated_at = datetime.now(locked_job.created_at.tzinfo) if (locked_job.created_at and locked_job.created_at.tzinfo) else datetime.utcnow()
+                        locked_job.updated_at = datetime.now(locked_job.created_at.tzinfo) if (locked_job.created_at and locked_job.created_at.tzinfo) else datetime.now(timezone.utc)
                         db.commit()
 
                         print(f"Assigning Job {locked_job.id} (conv={locked_job.id_convenio}) "

@@ -111,7 +111,8 @@ class IpasgoScraper(BaseScraper):
             "7": "op7_fat_facplan",
             "8": "op8_check_facplan",
             "9": "op9_anexos_facplan",
-            "10": "op10_recurso_glosa"
+            "10": "op10_recurso_glosa",
+            "11": "op11_import_guias_api"
         }
         
         op_name = op_map.get(str(rotina))

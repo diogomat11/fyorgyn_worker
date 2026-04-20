@@ -4,18 +4,20 @@ import json
 import logging
 
 class WebPlanClient:
-    def __init__(self, driver):
+    def __init__(self, driver, referer_url=None):
         """
         Inicia o client HTTP baseado em requisições a partir de um driver Selenium logado na OP0.
+        referer_url: URL de Referer a usar nos headers (deve corresponder à página que o Selenium navegou).
         """
         self.driver = driver
+        self.referer_url = referer_url or "https://novowebplanipasgo.facilinformatica.com.br/GuiasTISS/FaturamentoAtendimentos"
         self.session = self.get_authenticated_session()
 
     def get_authenticated_session(self):
         """
         Captura os cookies do Selenium e converte num objeto requests.Session().
         """
-        # Extrai User-Agent e cookies da sessão ativa atual (OP6 já navegou para a correta)
+        # Extrai User-Agent e cookies da sessão ativa atual
         selenium_cookies = self.driver.get_cookies()
         try:
             user_agent = self.driver.execute_script("return navigator.userAgent;")
@@ -30,7 +32,7 @@ class WebPlanClient:
             "Accept": "application/json, text/javascript, */*; q=0.01",
             "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
             "Origin": "https://novowebplanipasgo.facilinformatica.com.br",
-            "Referer": "https://novowebplanipasgo.facilinformatica.com.br/GuiasTISS/FaturamentoAtendimentos"
+            "Referer": self.referer_url
         })
         
         for cookie in selenium_cookies:
@@ -50,13 +52,14 @@ class WebPlanClient:
         headers = {
             "Content-Type": "application/json;charset=UTF-8",
             "X-Requested-With": "XMLHttpRequest",
-            "Accept": "application/json, text/javascript, */*; q=0.01"
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Referer": "https://novowebplanipasgo.facilinformatica.com.br/GuiasTISS/LocalizarProcedimentos"
         }
         
         payload = {
             "CodigoPrestador": str(codigo_prestador) if codigo_prestador else "",
-            "NumeroGuia": str(guia) if guia else "null",
-            "NumeroGuiaPrestador": "",
+            "NumeroGuia": str(guia) if guia else None,
+            "NumeroGuiaPrestador": None,
             "DtLiberacaoInicial": str(data_ini) if data_ini else "",
             "DtLiberacaoFinal": str(data_fim) if data_fim else "",
             "Page": page,

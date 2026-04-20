@@ -61,6 +61,7 @@ class BaseGuia(Base):
     status_guia = Column(Text, default="Autorizado")
     validade = Column(Date)
     codigo_terapia = Column(Text)
+    nome_terapia = Column(Text, nullable=True)
     qtde_solicitada = Column(Integer)
     sessoes_autorizadas = Column(Integer)
     timestamp_captura = Column(DateTime(timezone=True), nullable=True)
