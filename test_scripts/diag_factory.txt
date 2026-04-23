@@ -1,8 +1,0 @@
-Traceback (most recent call last):
-  File "C:\dev\Agenda_hub_MultiConv\Local_worker\test_scripts\diag_factory.py", line 8, in <module>
-    ScraperFactory.get_scraper(3)
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^
-  File "C:\dev\Agenda_hub_MultiConv\Local_worker\Worker\factory.py", line 20, in get_scraper
-    from core.scraper import UnimedScraper # Goiania (id=3)
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ImportError: cannot import name 'UnimedScraper' from 'core.scraper' (C:\dev\Agenda_hub_MultiConv\Local_worker\Worker\2-unimed_anapolis\core\scraper.py)

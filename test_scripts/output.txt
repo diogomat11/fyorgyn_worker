@@ -1,8 +1,0 @@
-Matches perfeitos:
-Total encontrados na amostragem: 0
-
---- Diagnosticando falhas ---
-Agendamentos que batem Paciente + Convenio + Terapia com uma Guia: 9
- + Verificacao de Status Validos: 9
- + Verificacao de Data (Entre Autorizacao e Validade): 9
- + Verificacao de Saldo > 0 (O que a Trigger ve e atualiza): 9

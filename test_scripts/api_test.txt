@@ -1,7 +1,0 @@
-﻿
---- User id=1, name=Clinica Larissa Martins Ferreira, convenio=3 ---
-  Status: 200
-  Total: 39, returned: 3
-    [INFO] Sync complete. Inserted: 2, Updated: 0
-    [INFO] Guia date 18/11/2024 is older than limit. Stopping.
-    [INFO] Scraped Guia 62891922
