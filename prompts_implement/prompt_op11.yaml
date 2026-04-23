@@ -1,0 +1,287 @@
+# Plano de prompt para geração/implementação da OP11 - IPASGO
+# Este arquivo documenta a instrução raiz para a automação
+
+objetivo: "Substituir a consulta em tela (Selenium - OP3) por chamadas HTTP paginadas (Requests - OP11)"
+referencia_arquitetura: "Seguir o modelo implementado na op6_check_baixados.py"
+requisitos_tecnicos:
+  - "Utilizar a sessão autenticada proveniente da OP0 (Login)"
+  - "Navegar previamente com Selenium para inicializar os cookies da rota de consulta de guias"
+  - "Extrair a sessão para um client nativo (WebPlanClient)"
+  - "Construir loop de requisições iterando sobre os metadados de paginação (total_pages)"
+  - "Não modificar ou deletar o arquivo da op3_import_guias.py"
+  - "Persistir resultados de forma modular (upsert) utilizando o padrão atual do DB"
+restricoes:
+  - "Manter organização limpa (Clean Code)"
+  - "Não deixar arquivos temporários no root"
+  - "Utilizar logs oficiais do scraper ao invés de prints"
+
+
+
+
+  op_name: OP11_CONSULTA_GUIAS_IPASGO
+
+description: >
+  Consulta paginada de guias/procedimentos no portal Ipasgo utilizando sessão autenticada.
+  A operação consome cookies e headers provenientes da OP0 (login) e replica fielmente
+  o comportamento esperado pelo backend (incluindo uso de "null" como string literal).
+
+dependency_chain:
+  - OP0_LOGIN:
+      outputs_required:
+        - session_cookies
+        - auth_headers
+
+base_config:
+  base_url: https://novowebplanipasgo.facilinformatica.com.br
+  endpoints:
+    bootstrap: /GuiasTISS/LocalizarProcedimentos
+    consulta: /LocalizarProcedimentos/Localizar
+
+job_parameters:
+
+  CodigoPrestador:
+    type: string
+    required: true
+
+  carteira:
+    type: string
+    required: false
+
+  CodigoBeneficiario:
+    type: string
+    required: false
+
+  guia:
+    type: string
+    required: false
+
+  DataIni:
+    type: string
+    required: false
+    format: yyyy-MM-dd
+
+  DataFim:
+    type: string
+    required: false
+    format: yyyy-MM-dd
+
+  Situacao:
+    type: string
+    required: false
+
+validation_rules:
+
+  - rule: "CodigoPrestador é obrigatório"
+
+  - rule: >
+      Se guia informado:
+        - NumeroGuia = guia
+        - Datas devem ser ""
+
+  - rule: >
+      Se carteira informada:
+        - NumeroCarteira = carteira
+        - Datas recomendadas
+
+  - rule: >
+      Campos não devem ser omitidos arbitrariamente; respeitar contrato da API
+
+session_handling:
+
+  strategy: reuse_from_OP0
+
+  required_headers:
+    - Cookie
+    - User-Agent
+    - Accept
+    - Content-Type
+
+  validation:
+    - verificar sessão ativa antes da execução
+    - em caso de falha: reexecutar OP0
+
+flow:
+
+  - step: 1
+    name: bootstrap_contexto
+    type: http_request
+    method: GET
+    url: ${base_config.base_url}${base_config.endpoints.bootstrap}
+    headers:
+      Cookie: session_cookies
+    description: >
+      Inicializa contexto da aplicação e garante consistência da sessão.
+
+  - step: 2
+    name: inicializar_variaveis
+    type: internal
+    variables:
+      current_page: 1
+      has_next_page: true
+
+  - step: 3
+    name: loop_paginacao
+    type: loop
+    condition: has_next_page == true
+
+    steps:
+
+      - step: 3.1
+        name: montar_payload
+        type: data_transformation
+        logic: |
+          payload = {
+            "CodigoPrestador": CodigoPrestador,
+            "NumeroGuia": guia if guia else "null",
+            "NumeroGuiaPrestador": "",
+            "DtLiberacaoInicial": DataIni if DataIni else "",
+            "DtLiberacaoFinal": DataFim if DataFim else "",
+            "Page": current_page,
+            "Ordenacao": "DataLiberacao",
+            "DestacarOPME": false,
+            "PesquisarTotalItens": true,
+            "DtAlteracaoInicial": "",
+            "DtAlteracaoFinal": "",
+            "CodigoEmpresaMedica": ""
+          }
+
+          # manter campos mesmo que vazios para evitar quebra de binding
+
+          payload["NumeroCarteira"] = carteira if carteira else ""
+          payload["CodigoBeneficiario"] = CodigoBeneficiario if CodigoBeneficiario else ""
+          payload["Situacao"] = Situacao if Situacao else ""
+
+      - step: 3.2
+        name: executar_request
+        type: http_request
+        method: POST
+        url: ${base_config.base_url}${base_config.endpoints.consulta}
+        headers:
+          Content-Type: application/json
+          Cookie: session_cookies
+        body: payload
+        output: response_json
+
+      - step: 3.3
+        name: validar_resposta
+        type: validation
+        rules:
+          - response_json != null
+          - response_json.Procedimentos exists
+
+      - step: 3.4
+        name: normalizar_dados
+        type: data_transformation
+        input: response_json.Procedimentos
+        output: guias_normalizadas
+        logic: |
+          lista = []
+
+          para cada item em Procedimentos:
+
+            guia_normalizada = {
+              "codigo_beneficiario": item.CodigoBenficiario,
+              "nome_beneficiario": item.NomeBeneficiario,
+              "codigo_prestador": item.CodigoPrestador,
+              "nome_prestador": item.NomePrestador,
+              "numero_guia": item.ChavesUtLib[0] if exists else null,
+              "situacao": item.Situacoes[0] if exists else null,
+              "codigo_amb": item.CodigoAMB,
+              "email_beneficiario": item.EmailBeneficiario if exists else null
+            }
+
+            lista.append(guia_normalizada)
+
+          return lista
+
+      - step: 3.5
+        name: avaliar_necessidade_senha
+        type: business_rule
+        input: guias_normalizadas
+        output: guias_enriquecidas
+        logic: |
+          para cada guia:
+
+            # Regra refinada: necessita_senha = True SE:
+            # situacao IN ["Autorizado", "Liberado", "Parcialmente autorizada"]
+            # AND guia.HasSenha == false
+            
+            if guia.situacao in ["Autorizado", "Liberado", "Parcialmente autorizada"] and guia.HasSenha == false:
+              guia["necessita_senha"] = true
+            else:
+              guia["necessita_senha"] = false
+
+      - step: 3.6
+        name: emitir_saida
+        type: job_output
+        strategy: streaming
+        payload: |
+          {
+            "page": current_page,
+            "total_registros": len(guias_enriquecidas),
+            "guias": guias_enriquecidas
+          }
+
+      - step: 3.7
+        name: controlar_paginacao
+        type: control
+        logic: |
+          if response_json.Procedimentos.length == 0:
+            has_next_page = false
+          else:
+            current_page += 1
+
+output_contract:
+
+  type: json
+  structure:
+    page: integer
+    total_registros: integer
+    guias:
+      - numero_guia: string
+        codigo_beneficiario: string
+        nome_beneficiario: string
+        codigo_prestador: string
+        nome_prestador: string
+        situacao: string
+        necessita_senha: boolean
+        codigo_amb: array
+        email_beneficiario: string
+
+error_handling:
+
+  - scenario: sessão expirada
+    action: reexecutar OP0_LOGIN automaticamente
+
+  - scenario: HTTP 401 ou 403
+    action: invalidar sessão e refazer login
+
+  - scenario: timeout
+    action: retry 3 vezes com backoff exponencial
+
+  - scenario: resposta fora do padrão
+    action: log estruturado + ignorar item inválido
+
+  - scenario: falha crítica
+    action: abortar execução e registrar erro
+
+performance:
+
+  - paginação incremental obrigatória
+  - processamento por página (baixo consumo de memória)
+  - retorno streaming por página
+  - preparado para paralelização futura
+
+observability:
+
+  logs:
+    - payload_enviado
+    - status_http
+    - tempo_execucao
+    - pagina_atual
+    - quantidade_registros
+
+  metrics:
+    - total_guias_processadas
+    - tempo_total_execucao
+    - taxa_erro
