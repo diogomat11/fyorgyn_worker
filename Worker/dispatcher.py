@@ -464,6 +464,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                             codigo_terapia_val = item.get("codigo_terapia", item.get("codigo_procedimento"))
                             nome_terapia_val = item.get("nome_terapia")
                             codigo_benef = item.get("codigo_beneficiario")
+                            guia_prestador_val = item.get("guia_prestador")
                             
                             status_guia_val = str(item.get("status_guia", item.get("status", "Autorizado"))).strip()
                             
@@ -527,6 +528,8 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                                     existing_guia.nome_terapia = nome_terapia_val
                                 if codigo_benef:
                                     existing_guia.codigo_beneficiario = codigo_benef
+                                if guia_prestador_val:
+                                    existing_guia.guia_prestador = guia_prestador_val
                                 if current_cid and not existing_guia.carteirinha_id:
                                     existing_guia.carteirinha_id = current_cid
                                 existing_guia.updated_at = datetime.now(timezone.utc)
@@ -539,6 +542,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                                     id_convenio=id_convenio,
                                     carteirinha_id=current_cid,
                                     guia=guia_num,
+                                    guia_prestador=guia_prestador_val,
                                     codigo_beneficiario=codigo_benef,
                                     data_autorizacao=data_auth_parsed,
                                     senha=senha_val,

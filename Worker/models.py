@@ -55,6 +55,7 @@ class BaseGuia(Base):
     carteirinha_id = Column(Integer, ForeignKey("carteirinhas.id", ondelete="CASCADE"))
     id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="SET NULL"), nullable=True)
     guia = Column(Text)
+    guia_prestador = Column(Text, nullable=True)  # NumeroGuiaPrestador from IPASGO API
     codigo_beneficiario = Column(Text, nullable=True)
     data_autorizacao = Column(Date)
     senha = Column(Text)

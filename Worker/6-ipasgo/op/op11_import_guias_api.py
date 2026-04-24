@@ -234,6 +234,9 @@ def _save_rows_local(rows, logger):
                 guia_record.senha = row_data.get("senha")
                 guia_record.nome_terapia = row_data.get("nome_terapia")
                 
+                if "guia_prestador" in row_data:
+                    guia_record.guia_prestador = row_data["guia_prestador"]
+                
                 if cod_terapia:
                     guia_record.codigo_terapia = cod_terapia
                 
@@ -370,7 +373,10 @@ def run(scraper, job_data):
             if not numero_guia:
                 chaves = item.get("ChavesUtLib", [])
                 numero_guia = chaves[0] if chaves else None
-            
+
+            # NumeroGuiaPrestador está na raiz de cada procedimento (mesmo nível de NumeroGuiaOperadora)
+            numero_guia_prestador = item.get("NumeroGuiaPrestador")
+
             status_guia = item.get("SituacaoTiss") or ""
             if not status_guia:
                 status_guia = item.get("Situacao") or ""
@@ -392,6 +398,7 @@ def run(scraper, job_data):
             
             # ── Agrupar Itens por CodigoAMB ──
             itens = item.get("Itens", [])
+            
             grupos_por_amb = {}  # { "0.00.11.18-5": [item1, item2, ...], ... }
             for it in itens:
                 amb = it.get("CodigoAMB", "")
@@ -424,6 +431,7 @@ def run(scraper, job_data):
                     "codigo_prestador": item.get("CodigoPrestador"),
                     "nome_prestador": item.get("NomePrestador"),
                     "numero_guia": numero_guia,
+                    "guia_prestador": numero_guia_prestador,
                     "status_guia": status_guia,
                     "codigo_terapia": codigo_terapia,
                     "data_autorizacao": data_autorizacao,
