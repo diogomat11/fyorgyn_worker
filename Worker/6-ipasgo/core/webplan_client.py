@@ -198,3 +198,87 @@ class WebPlanClient:
                 if attempt == 2:
                     raise e
                 time.sleep(3)
+
+    def criar_novo_lote(self, codigo_prestador, data_fim):
+        """
+        OP13 - POST para criar um novo lote de faturamento.
+        Endpoint: /FaturamentoAtendimentos/SalvarLote
+        (O endpoint exato varia na API do IPASGO, mas geralmente é um POST de criação).
+        """
+        url = "https://novowebplanipasgo.facilinformatica.com.br/FaturamentoAtendimentos/SalvarLote"
+        
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+        }
+        
+        # This payload might need adjustments depending on the exact FacilInformatica schema for new lots
+        payload = {
+            "CodigoPrestador": codigo_prestador,
+            "DataFim": data_fim,
+            "TipoAtendimento": "SADT" # or empty depending on requirements
+        }
+        
+        for attempt in range(3):
+            try:
+                resp = self.session.post(url, headers=headers, data=payload, timeout=20)
+                if 'text/html' in resp.headers.get('Content-Type', ''):
+                    raise ValueError(f"Sessão Rejeitada (Retornou HTML). Status: {resp.status_code}. URL: {resp.url}")
+                
+                resp.raise_for_status()
+                data = resp.json()
+                
+                if isinstance(data, str):
+                    try:
+                        import json
+                        data = json.loads(data)
+                    except:
+                        pass
+                        
+                if isinstance(data, dict) and data.get("HasError", False):
+                    raise ValueError(f"API Error CriarLote: {data.get('ErrorMessage')}")
+                return data
+            except Exception as e:
+                logging.error(f"Erro no CriarLote: {e}")
+                if attempt == 2:
+                    raise e
+                time.sleep(3)
+                
+    def cancelar_lote(self, numero_lote, codigo_prestador):
+        """
+        OP14 - POST para cancelar um lote
+        """
+        url = "https://novowebplanipasgo.facilinformatica.com.br/FaturamentoAtendimentos/CancelarLote"
+        
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+        }
+        
+        payload = {
+            "loteId": numero_lote,
+            "codigoPrestador": codigo_prestador
+        }
+        
+        for attempt in range(3):
+            try:
+                resp = self.session.post(url, headers=headers, data=payload, timeout=20)
+                if 'text/html' in resp.headers.get('Content-Type', ''):
+                    raise ValueError(f"Sessão Rejeitada (Retornou HTML). Status: {resp.status_code}. URL: {resp.url}")
+                
+                resp.raise_for_status()
+                data = resp.json()
+                
+                if isinstance(data, str):
+                    try:
+                        import json
+                        data = json.loads(data)
+                    except:
+                        pass
+                        
+                if isinstance(data, dict) and data.get("HasError", False):
+                    raise ValueError(f"API Error CancelarLote: {data.get('ErrorMessage')}")
+                return data
+            except Exception as e:
+                logging.error(f"Erro no CancelarLote: {e}")
+                if attempt == 2:
+                    raise e
+                time.sleep(3)

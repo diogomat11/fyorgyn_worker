@@ -19,21 +19,25 @@
 - Valida o card da guia preenchida no Dom via `data-bind="text: NumeroGuiaOperadora"`.
 
 ### 2.3 Acionamento do Modal de Execução
-- Localiza o ícone de ação (Engrenagem/Executar) usando `data-bind="click: $root.abrirModalConfirmarProcedimentos"`.
-- **Validação de Status Analógico:** Caso o elemento contenha o estilo CSS `grayscale(1)`, o robô registra status **totalmente_executada** e aborta com sucesso (Guia já baixada).
-- Caso liberado, despacha o `.click()` e aguarda estabilização do Angular para preenchimento do Modal `.noty_modal`.
+- Localiza o ícone de ação (Detalhar/Executar) usando um XPath estrito `//*[@id="localizarprocedimentos"]/.../i[2]`.
+- **Validação de Status Analógico:** Caso o atributo `style` do elemento contenha `grayscale(1)`, o robô registra status **totalmente_executada** e aborta com sucesso (todas as sessões já foram confirmadas ou não há sessões pendentes).
+- Caso liberado, despacha o `.click()` e aguarda estabilização do Angular (desaparecimento dos spinners) para abertura do Modal.
 
-### 2.4 Preenchimento de Sessões
-- A lógica é iterativa baseando-se no limite `sessoes_realizadas`.
+### 2.4 Preenchimento e Confirmação de Sessões
+- A lógica é iterativa baseando-se no limite `sessoes_realizadas` (parâmetro fornecido).
 - Procura o grid interno do modal: `//*[@id="indentificar-confirmar-procedimentos-modal"]//div[contains(@class, "card-body")]/div[contains(@class, "col-xs-")]`.
-- Para cada box mapeado ativo:
-  - Limpa e preenche o input de data atrelado a ele com `data_execucao`.
-  - Sinaliza o checkbox `(input[type="checkbox"])` via JS Click simulado `arguments[0].click()`.
+- Para cada box mapeado ativo (até o limite estabelecido):
+  - Verifica se a sessão já está confirmada ignorando se não houver o texto "Não confirmado".
+  - Procura e clica no botão de confirmação: `button[@data-bind="visible: HabilitadoConfirmacao"]`.
+  - Habilita e limpa o input da carteirinha (`//*[@id="numeroDaCarteiraConfirmacao"]`), enviando o número da `carteira`.
+  - Aguarda a notificação do sistema Noty (Angular Toaster) via `//span[@class="noty_text"]` para validar a mensagem de sucesso.
+  - Se sucesso, incrementa o contador e fecha o Noty. Se erro, levanta exceção de `PermanentError`.
+- Por fim, localiza e clica no botão "Fechar" ou `data-dismiss="modal"` para sair do painel.
   
-### 2.5 Confirmação Final e Tear-Down
-- Mapeia o botão verde "Confirmar Procedimentos" via `//*[@id="btn_confirmar"]` ou texto semântico.
-- Aguarda timeout do Spinner de carregamento assíncrono.
-- Fecha Iframes residuais. Retorna objeto contendo a `guia`, cópias/sessoes efetivadas e `sucesso: True`.
+### 2.5 Tear-Down e Retorno
+- Após iterar as sessões, o modal é fechado através do botão "Fechar" (ou botão padrão de `data-dismiss`).
+- O log informa a quantidade de sessões executadas com sucesso no lote.
+- O Worker retorna `{sucesso: True, sessoes_realizadas_aplicadas: N, numero_guia: '...'}` para o Dispatcher.
 
 ## 3. Integração com Milestones (Em Breve)
 OP4 compartilhará do **Marco 2** (Refresh de Carga no Painel) para evitar timeouts da UI "Localizar Procedimento", garantindo que falhas de load isoladas não retrocedam toda a jornada ao OP0 (Login).

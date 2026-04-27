@@ -396,7 +396,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
             db.close()
             
             try:
-                resp = requests.post(f"{url}/process_job", json=payload, timeout=300)
+                resp = requests.post(f"{url}/process_job", json=payload, timeout=600)
             finally:
                 # Re-acquire connection to process results or errors
                 db = SessionLocal()
