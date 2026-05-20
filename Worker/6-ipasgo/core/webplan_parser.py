@@ -45,6 +45,15 @@ def parse_detalhes(json_response, lote_id_param=None):
             val_str = item.get("ValorProcedimento")
             valor_proc = float(val_str) if val_str else 0.0
 
+            codigo_amb_raw = item.get("CodigoAMB") or item.get("CodigoAmb") or item.get("codigoAmb") or item.get("codigoAMB")
+            codigo_amb = str(codigo_amb_raw) if codigo_amb_raw else ""
+            
+            if codigo_amb:
+                codigo_amb = codigo_amb.replace(".", "").replace("-", "")
+            
+            fallback_val = item.get("CodigoProcedimento") or item.get("ProcedimentoCodigo") or item.get("Codigo") or ""
+            cod_procedimento_fat = codigo_amb if codigo_amb else str(fallback_val)
+
             parsed_item = {
                 "loteId": lote_id,
                 "detalheId": item.get("Id"),
@@ -52,7 +61,8 @@ def parse_detalhes(json_response, lote_id_param=None):
                 "dataRealizacao": data_realizacao,
                 "Guia": item.get("Guia"),
                 "StatusConferencia": item.get("StatusConferencia"),
-                "ValorProcedimento": valor_proc
+                "ValorProcedimento": valor_proc,
+                "cod_procedimento_fat": cod_procedimento_fat
             }
             items.append(parsed_item)
         except Exception as e:

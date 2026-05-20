@@ -43,6 +43,14 @@ class WebPlanClient:
             
         return session
 
+    def refresh_session(self):
+        """
+        Recaptura os cookies do Selenium e atualiza a sessão HTTP.
+        Deve ser chamado após qualquer navegação relevante para garantir que
+        os cookies do FacPlan (sessão autenticada) estejam presentes.
+        """
+        self.session = self.get_authenticated_session()
+
     def post_consultar_guias(self, page=1, codigo_prestador="", guia="", data_ini="", data_fim="", carteira="", codigo_beneficiario="", situacao=""):
         """
         OP11 - POST para busca de guias no endpoint LocalizarProcedimentos/Localizar
@@ -177,6 +185,12 @@ class WebPlanClient:
                 resp = self.session.post(url, headers=headers, data=payload, timeout=20)
                 
                 if 'text/html' in resp.headers.get('Content-Type', ''):
+                    if attempt < 2:
+                        # Session likely expired — refresh cookies and retry
+                        logging.warning(f"ModificarDetalhe retornou HTML (sessão expirada?). Refrescando sessão e retentando...")
+                        self.refresh_session()
+                        time.sleep(2)
+                        continue
                     raise ValueError(f"OP7 Sessão Rejeitada (Retornou HTML). Status: {resp.status_code}. URL: {resp.url}")
                     
                 resp.raise_for_status()
@@ -199,28 +213,26 @@ class WebPlanClient:
                     raise e
                 time.sleep(3)
 
-    def criar_novo_lote(self, codigo_prestador, data_fim):
+    def gerar_lote(self, codigo_prestador, data_fim):
         """
         OP13 - POST para criar um novo lote de faturamento.
-        Endpoint: /FaturamentoAtendimentos/SalvarLote
-        (O endpoint exato varia na API do IPASGO, mas geralmente é um POST de criação).
+        Endpoint: /FaturamentoAtendimentos/GerarLote
         """
-        url = "https://novowebplanipasgo.facilinformatica.com.br/FaturamentoAtendimentos/SalvarLote"
+        url = "https://novowebplanipasgo.facilinformatica.com.br/FaturamentoAtendimentos/GerarLote"
         
         headers = {
             "Content-Type": "application/x-www-form-urlencoded",
         }
         
-        # This payload might need adjustments depending on the exact FacilInformatica schema for new lots
         payload = {
-            "CodigoPrestador": codigo_prestador,
-            "DataFim": data_fim,
-            "TipoAtendimento": "SADT" # or empty depending on requirements
+            "codigoPrestador": codigo_prestador,
+            "dataFinal": data_fim
         }
         
+        # O GerarLote pode demorar bastante e dar timeout. Aumentamos o timeout ou lidamos com o polling
         for attempt in range(3):
             try:
-                resp = self.session.post(url, headers=headers, data=payload, timeout=20)
+                resp = self.session.post(url, headers=headers, data=payload, timeout=600)
                 if 'text/html' in resp.headers.get('Content-Type', ''):
                     raise ValueError(f"Sessão Rejeitada (Retornou HTML). Status: {resp.status_code}. URL: {resp.url}")
                 
@@ -235,10 +247,45 @@ class WebPlanClient:
                         pass
                         
                 if isinstance(data, dict) and data.get("HasError", False):
-                    raise ValueError(f"API Error CriarLote: {data.get('ErrorMessage')}")
+                    raise ValueError(f"API Error GerarLote: {data.get('ErrorMessage')}")
                 return data
             except Exception as e:
-                logging.error(f"Erro no CriarLote: {e}")
+                logging.error(f"Erro no GerarLote: {e}")
+                if attempt == 2:
+                    raise e
+                time.sleep(3)
+
+    def load_lotes(self, codigo_prestador, page=0, quantidade=10):
+        """
+        Load Lotes para verificar o status e capturar o ID recém gerado.
+        """
+        url = "https://novowebplanipasgo.facilinformatica.com.br/FaturamentoAtendimentos/LoadLotes"
+        
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+        }
+        
+        payload = {
+            "page": page,
+            "quantidadePorPagina": quantidade,
+            "codigoPrestador": codigo_prestador,
+            "login": ""
+        }
+        
+        for attempt in range(3):
+            try:
+                resp = self.session.post(url, headers=headers, data=payload, timeout=20)
+                if 'text/html' in resp.headers.get('Content-Type', ''):
+                    raise ValueError(f"Sessão Rejeitada (Retornou HTML). Status: {resp.status_code}")
+                
+                resp.raise_for_status()
+                data = resp.json()
+                if isinstance(data, str):
+                    import json
+                    data = json.loads(data)
+                return data
+            except Exception as e:
+                logging.error(f"Erro no LoadLotes: {e}")
                 if attempt == 2:
                     raise e
                 time.sleep(3)
@@ -254,8 +301,7 @@ class WebPlanClient:
         }
         
         payload = {
-            "loteId": numero_lote,
-            "codigoPrestador": codigo_prestador
+            "loteId": numero_lote
         }
         
         for attempt in range(3):

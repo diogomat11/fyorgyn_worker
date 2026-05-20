@@ -366,18 +366,22 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
     # Define call_server outside loop to avoid redefinition, but it needs access to server_status_map
     # easier to keep it inside or pass map as arg. Let's pass map as arg or use closure here.
     
-    def call_server(url, job_id, carteirinha, carteirinha_id, id_convenio, rotina, params, status_map):
+    def call_server(url, job_id, carteirinha, carteirinha_id, id_convenio, rotina, params, status_map, user_id=None):
         db = SessionLocal()
         import json as _json
         try:
-            # Ensure params is serialized as a JSON string (not a dict)
-            # SQLAlchemy on PostgreSQL JSONB columns may return a dict instead of str
-            if isinstance(params, dict):
-                params_str = _json.dumps(params)
-            elif isinstance(params, str):
-                params_str = params
-            else:
-                params_str = None
+            params_dict = params if isinstance(params, dict) else (_json.loads(params) if params else {})
+            
+            # Inject credentials directly into params for Bradesco to avoid double-fetching and ensure they arrive in the payload
+            if id_convenio == 1 and user_id:
+                from models import UserConvenio
+                uconv = db.query(UserConvenio).filter(UserConvenio.user_id == user_id, UserConvenio.id_convenio == 1).first()
+                if uconv:
+                    params_dict["login"] = uconv.login
+                    params_dict["senha_criptografada"] = uconv.senha_criptografada
+                    params_dict["cod_prestador"] = uconv.cod_prestador
+                    
+            params_str = _json.dumps(params_dict)
 
             payload = {
                 "job_id": job_id,
@@ -386,7 +390,8 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 "params": params_str,
                 "carteirinha_id": carteirinha_id,
                 "carteirinha": carteirinha,
-                "paciente": "" 
+                "paciente": "",
+                "user_id": user_id
             }
             # Log attempt
             db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, level="INFO", message=f"Dispatching to {url}"))
@@ -429,148 +434,163 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 results = data.get("data", [])
                 
                 try:
-                    count_inserted = 0
-                    count_updated = 0
+                    # Check if the worker already persisted data internally (OP6, OP7, etc.)
+                    worker_meta = data.get("meta", {})
+                    if worker_meta.get("self_persisted"):
+                        ins = worker_meta.get("inserted", 0)
+                        upd = worker_meta.get("updated", 0)
+                        tot = worker_meta.get("total", 0)
+                        msg = f"Sync complete (Worker). Inserted: {ins}, Updated: {upd}, Total extraídos: {tot}"
+                        db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, level="INFO", message=msg))
+                        db.commit()
+                    elif not results:
+                        # No results and no self_persisted flag — just log empty sync
+                        db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, level="INFO", message="Sync complete. Inserted: 0, Updated: 0 (Worker retornou vazio)"))
+                        db.commit()
+                    else:
+                        count_inserted = 0
+                        count_updated = 0
                     
-                    def parse_date(date_str):
-                        if not date_str or not isinstance(date_str, str): return None
-                        try: return datetime.strptime(date_str.strip(), "%d/%m/%Y").date()
-                        except: return None
+                        def parse_date(date_str):
+                            if not date_str or not isinstance(date_str, str): return None
+                            try: return datetime.strptime(date_str.strip(), "%d/%m/%Y").date()
+                            except: return None
                         
-                    def parse_int_safe(val, default=0):
-                        try:
-                            clean = str(val).strip()
-                            if not clean or clean.lower() in ["none", "null"]: return default
-                            return int(clean)
-                        except:
-                            return default
+                        def parse_int_safe(val, default=0):
+                            try:
+                                clean = str(val).strip()
+                                if not clean or clean.lower() in ["none", "null"]: return default
+                                return int(clean)
+                            except:
+                                return default
                             
-                    def parse_date_robust(date_str):
-                        if not date_str or not isinstance(date_str, str): return None
-                        clean = date_str.strip()[:10]
-                        try:
-                            if "-" in clean: return datetime.strptime(clean, "%Y-%m-%d").date()
-                            return datetime.strptime(clean, "%d/%m/%Y").date()
-                        except: return None
+                        def parse_date_robust(date_str):
+                            if not date_str or not isinstance(date_str, str): return None
+                            clean = date_str.strip()[:10]
+                            try:
+                                if "-" in clean: return datetime.strptime(clean, "%Y-%m-%d").date()
+                                return datetime.strptime(clean, "%d/%m/%Y").date()
+                            except: return None
 
-                    for item in results:
-                        try:
-                            qtd_solic_val = parse_int_safe(item.get("qtde_solicitada", item.get("qtde_solicitado")), 0)
-                            qtd_aut_val = parse_int_safe(item.get("qtde_autorizada", item.get("sessoes_autorizadas", item.get("qtde_autorizado"))), 0)
-                            guia_num = str(item.get("numero_guia", item.get("guia", ""))).strip()
-                            data_auth_parsed = parse_date_robust(item.get("data_autorizacao"))
-                            validade_parsed = parse_date_robust(item.get("validade_senha", item.get("data_validade", item.get("validade"))))
-                            senha_val = str(item.get("senha", "")).strip() if item.get("senha") else None
-                            codigo_terapia_val = item.get("codigo_terapia", item.get("codigo_procedimento"))
-                            nome_terapia_val = item.get("nome_terapia")
-                            codigo_benef = item.get("codigo_beneficiario")
-                            guia_prestador_val = item.get("guia_prestador")
-                            
-                            status_guia_val = str(item.get("status_guia", item.get("status", "Autorizado"))).strip()
-                            
-                            # Resolve dynamic Carteirinha ID for standalone jobs spanning full portal
-                            current_cid = carteirinha_id
-                            if not current_cid and codigo_benef:
-                                cart = db.query(Carteirinha).filter(Carteirinha.codigo_beneficiario == codigo_benef).first()
-                                if cart:
-                                    current_cid = cart.id
-
-                            # ── Busca em 2 fases para evitar duplicatas ──
-                            existing_guia = None
-                            
-                            # Fase 1: Match exato (guia + codigo_terapia + owner)
-                            if current_cid:
-                                filters = [
-                                    BaseGuia.carteirinha_id == current_cid,
-                                    BaseGuia.id_convenio == id_convenio,
-                                    BaseGuia.guia == guia_num
-                                ]
-                                if codigo_terapia_val:
-                                    filters.append(BaseGuia.codigo_terapia == codigo_terapia_val)
-                                existing_guia = db.query(BaseGuia).filter(*filters).first()
-                            elif codigo_benef:
-                                filters = [
-                                    BaseGuia.codigo_beneficiario == codigo_benef,
-                                    BaseGuia.id_convenio == id_convenio,
-                                    BaseGuia.guia == guia_num
-                                ]
-                                if codigo_terapia_val:
-                                    filters.append(BaseGuia.codigo_terapia == codigo_terapia_val)
-                                existing_guia = db.query(BaseGuia).filter(*filters).first()
-                            
-                            # Fase 2: Fallback — buscar com codigo_terapia NULL/vazio
-                            # (registros criados por OP3 que não tinham o código)
-                            if not existing_guia and codigo_terapia_val:
-                                from sqlalchemy import or_
-                                fallback_filters = [
-                                    BaseGuia.id_convenio == id_convenio,
-                                    BaseGuia.guia == guia_num,
-                                    or_(
-                                        BaseGuia.codigo_terapia == None,
-                                        BaseGuia.codigo_terapia == ""
-                                    )
-                                ]
-                                if current_cid:
-                                    fallback_filters.append(BaseGuia.carteirinha_id == current_cid)
-                                elif codigo_benef:
-                                    fallback_filters.append(BaseGuia.codigo_beneficiario == codigo_benef)
-                                existing_guia = db.query(BaseGuia).filter(*fallback_filters).first()
-
-                            if existing_guia:
-                                existing_guia.data_autorizacao = data_auth_parsed
-                                existing_guia.senha = senha_val
-                                existing_guia.status_guia = status_guia_val
-                                existing_guia.validade = validade_parsed
-                                existing_guia.codigo_terapia = codigo_terapia_val
-                                existing_guia.qtde_solicitada = qtd_solic_val
-                                existing_guia.sessoes_autorizadas = qtd_aut_val
-                                if nome_terapia_val:
-                                    existing_guia.nome_terapia = nome_terapia_val
-                                if codigo_benef:
-                                    existing_guia.codigo_beneficiario = codigo_benef
-                                if guia_prestador_val:
-                                    existing_guia.guia_prestador = guia_prestador_val
-                                if current_cid and not existing_guia.carteirinha_id:
-                                    existing_guia.carteirinha_id = current_cid
-                                existing_guia.updated_at = datetime.now(timezone.utc)
-                                count_updated += 1
-                            else:
-                                if status_guia_val.upper() not in ["AUTORIZADO", "EM ESTUDO", "SOLICITADO", "EM AVALIAÇÃO", "EM APROVAÇÃO E AGUARDANDO P", "NEGADO", "CANCELADO"]:
-                                    continue
+                        for item in results:
+                            try:
+                                qtd_solic_val = parse_int_safe(item.get("qtde_solicitada", item.get("qtde_solicitado")), 0)
+                                qtd_aut_val = parse_int_safe(item.get("qtde_autorizada", item.get("sessoes_autorizadas", item.get("qtde_autorizado"))), 0)
+                                guia_num = str(item.get("numero_guia", item.get("guia", ""))).strip()
+                                data_auth_parsed = parse_date_robust(item.get("data_autorizacao"))
+                                validade_parsed = parse_date_robust(item.get("validade_senha", item.get("data_validade", item.get("validade"))))
+                                senha_val = str(item.get("senha", "")).strip() if item.get("senha") else None
+                                codigo_terapia_val = item.get("codigo_terapia", item.get("codigo_procedimento"))
+                                nome_terapia_val = item.get("nome_terapia")
+                                codigo_benef = item.get("codigo_beneficiario")
+                                guia_prestador_val = item.get("guia_prestador")
                                 
-                                new_guia = BaseGuia(
-                                    id_convenio=id_convenio,
-                                    carteirinha_id=current_cid,
-                                    guia=guia_num,
-                                    guia_prestador=guia_prestador_val,
-                                    codigo_beneficiario=codigo_benef,
-                                    data_autorizacao=data_auth_parsed,
-                                    senha=senha_val,
-                                    status_guia=status_guia_val,
-                                    validade=validade_parsed,
-                                    codigo_terapia=codigo_terapia_val,
-                                    nome_terapia=nome_terapia_val,
-                                    qtde_solicitada=qtd_solic_val,
-                                    sessoes_autorizadas=qtd_aut_val,
-                                    created_at=datetime.now(timezone.utc)
-                                )
-                                db.add(new_guia)
-                                count_inserted += 1
-                        except Exception as item_e:
-                            import traceback
-                            trace_str = traceback.format_exc()
-                            logger.error(f"Error processing item: {item_e}\n{trace_str}")
-                            db.rollback()
-                            db.add(Log(
-                                job_id=job_id, 
-                                carteirinha_id=carteirinha_id, 
-                                level="ERROR", 
-                                message=f"Item falhou guia {item.get('numero_guia')}: {item_e} | Payload: {str(item)[:200]}"
-                            ))
-                            db.commit()
+                                status_guia_val = str(item.get("status_guia", item.get("status", "Autorizado"))).strip()
+                                
+                                # Resolve dynamic Carteirinha ID for standalone jobs spanning full portal
+                                current_cid = carteirinha_id
+                                if not current_cid and codigo_benef:
+                                    cart = db.query(Carteirinha).filter(Carteirinha.codigo_beneficiario == codigo_benef).first()
+                                    if cart:
+                                        current_cid = cart.id
 
-                    db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, level="INFO", message=f"Sync complete. Inserted: {count_inserted}, Updated: {count_updated}"))
-                    db.commit()
+                                # ── Busca em 2 fases para evitar duplicatas ──
+                                existing_guia = None
+                                
+                                # Fase 1: Match exato (guia + codigo_terapia + owner)
+                                if current_cid:
+                                    filters = [
+                                        BaseGuia.carteirinha_id == current_cid,
+                                        BaseGuia.id_convenio == id_convenio,
+                                        BaseGuia.guia == guia_num
+                                    ]
+                                    if codigo_terapia_val:
+                                        filters.append(BaseGuia.codigo_terapia == codigo_terapia_val)
+                                    existing_guia = db.query(BaseGuia).filter(*filters).first()
+                                elif codigo_benef:
+                                    filters = [
+                                        BaseGuia.codigo_beneficiario == codigo_benef,
+                                        BaseGuia.id_convenio == id_convenio,
+                                        BaseGuia.guia == guia_num
+                                    ]
+                                    if codigo_terapia_val:
+                                        filters.append(BaseGuia.codigo_terapia == codigo_terapia_val)
+                                    existing_guia = db.query(BaseGuia).filter(*filters).first()
+                                
+                                # Fase 2: Fallback — buscar com codigo_terapia NULL/vazio
+                                # (registros criados por OP3 que não tinham o código)
+                                if not existing_guia and codigo_terapia_val:
+                                    from sqlalchemy import or_
+                                    fallback_filters = [
+                                        BaseGuia.id_convenio == id_convenio,
+                                        BaseGuia.guia == guia_num,
+                                        or_(
+                                            BaseGuia.codigo_terapia == None,
+                                            BaseGuia.codigo_terapia == ""
+                                        )
+                                    ]
+                                    if current_cid:
+                                        fallback_filters.append(BaseGuia.carteirinha_id == current_cid)
+                                    elif codigo_benef:
+                                        fallback_filters.append(BaseGuia.codigo_beneficiario == codigo_benef)
+                                    existing_guia = db.query(BaseGuia).filter(*fallback_filters).first()
+
+                                if existing_guia:
+                                    existing_guia.data_autorizacao = data_auth_parsed
+                                    existing_guia.senha = senha_val
+                                    existing_guia.status_guia = status_guia_val
+                                    existing_guia.validade = validade_parsed
+                                    existing_guia.codigo_terapia = codigo_terapia_val
+                                    existing_guia.qtde_solicitada = qtd_solic_val
+                                    existing_guia.sessoes_autorizadas = qtd_aut_val
+                                    if nome_terapia_val:
+                                        existing_guia.nome_terapia = nome_terapia_val
+                                    if codigo_benef:
+                                        existing_guia.codigo_beneficiario = codigo_benef
+                                    if guia_prestador_val:
+                                        existing_guia.guia_prestador = guia_prestador_val
+                                    if current_cid and not existing_guia.carteirinha_id:
+                                        existing_guia.carteirinha_id = current_cid
+                                    existing_guia.updated_at = datetime.now(timezone.utc)
+                                    count_updated += 1
+                                else:
+                                    if status_guia_val.upper() not in ["AUTORIZADO", "EM ESTUDO", "SOLICITADO", "EM AVALIAÇÃO", "EM APROVAÇÃO E AGUARDANDO P", "NEGADO", "CANCELADO"]:
+                                        continue
+                                    
+                                    new_guia = BaseGuia(
+                                        id_convenio=id_convenio,
+                                        carteirinha_id=current_cid,
+                                        guia=guia_num,
+                                        guia_prestador=guia_prestador_val,
+                                        codigo_beneficiario=codigo_benef,
+                                        data_autorizacao=data_auth_parsed,
+                                        senha=senha_val,
+                                        status_guia=status_guia_val,
+                                        validade=validade_parsed,
+                                        codigo_terapia=codigo_terapia_val,
+                                        nome_terapia=nome_terapia_val,
+                                        qtde_solicitada=qtd_solic_val,
+                                        sessoes_autorizadas=qtd_aut_val,
+                                        user_id=user_id,
+                                        created_at=datetime.now(timezone.utc)
+                                    )
+                                    db.add(new_guia)
+                                    count_inserted += 1
+                            except Exception as item_e:
+                                import traceback
+                                trace_str = traceback.format_exc()
+                                logger.error(f"Error processing item: {item_e}\n{trace_str}")
+                                db.rollback()
+                                db.add(Log(
+                                    job_id=job_id, 
+                                    carteirinha_id=carteirinha_id, 
+                                    level="ERROR", 
+                                    message=f"Item falhou guia {item.get('numero_guia')}: {item_e} | Payload: {str(item)[:200]}"
+                                ))
+                                db.commit()
+
+                        db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, level="INFO", message=f"Sync complete. Inserted: {count_inserted}, Updated: {count_updated}"))
+                        db.commit()
                 except Exception as save_e:
                     logger.error(f"Error saving results: {save_e}")
                     db.rollback()
@@ -667,10 +687,23 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 def pick_server(job, idle_servers):
                     """Pick the best idle server for this job using priority rules."""
                     
+                    # Strict User-Affinity for Bradesco to avoid double-session
+                    if job.id_convenio == 1 and job.user_id:
+                        for s_url, s_meta in server_status_map.items():
+                            if s_meta.get("last_convenio_id") == 1 and s_meta.get("last_user_id") == job.user_id:
+                                if s_url in idle_servers:
+                                    return s_url
+                                else:
+                                    # User is already processing a job on another server. Must wait!
+                                    return None
+                                    
                     last_conv_match = []
                     for s in idle_servers:
+                        # For Bradesco, prefer an idle server that has NO user session, or matches user
                         if server_status_map[s].get("last_convenio_id") == job.id_convenio:
-                            # Verify if this URL has an explicit hardcoded Convenio restriction from ENV
+                            if job.id_convenio == 1 and job.user_id:
+                                if server_status_map[s].get("last_user_id") != job.user_id:
+                                    continue # Don't hijack another user's Bradesco session if possible
                             bindings = server_convenio_map.get(s)
                             if bindings is None or job.id_convenio in bindings:
                                 last_conv_match.append(s)
@@ -712,7 +745,9 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                         break
                     
                     server_url = pick_server(job, idle)
-
+                    if server_url is None:
+                        logger.info(f"Skipping job {job.id}: Strict session affinity enforced (Server Busy)")
+                        continue
                     
                     # --- Anti double-dispatch: row-level lock ---
                     try:
@@ -755,6 +790,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                     
                     server_status_map[server_url]["status"] = "busy"
                     server_status_map[server_url]["last_convenio_id"] = locked_job.id_convenio
+                    server_status_map[server_url]["last_user_id"] = locked_job.user_id
                     dispatched_servers.add(server_url)
                     
                     # Spawn thread to call worker server
@@ -762,7 +798,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                         target=call_server,
                         args=(server_url, locked_job.id, locked_job.carteirinha_rel.carteirinha if locked_job.carteirinha_rel else "",
                               locked_job.carteirinha_id, locked_job.id_convenio,
-                              locked_job.rotina, locked_job.params, server_status_map)
+                              locked_job.rotina, locked_job.params, server_status_map, locked_job.user_id)
                     )
                     t.start()
                     

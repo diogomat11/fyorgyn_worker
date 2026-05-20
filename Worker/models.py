@@ -1,119 +1,264 @@
-"""
-Independent models for Worker
-Mirrors the backend models for tables the Worker needs access to
-"""
-from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, Text, Float, Boolean
+from sqlalchemy import Column, Integer, String, Date, DateTime, Time, ForeignKey, Text, Float, Boolean, JSON
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
 
+class UserConvenio(Base):
+    __tablename__ = "user_convenios"
+    __table_args__ = {'extend_existing': True}
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="CASCADE"))
+    # Credenciais específicas do usuário para este convênio
+    login = Column(Text, nullable=True)
+    senha_criptografada = Column(Text, nullable=True)
+    cod_prestador = Column(Text, nullable=True)
+    # Credenciais para portal de faturamento (quando diferente do portal de autorização)
+    login_fat = Column(Text, nullable=True)
+    senha_fat_criptografada = Column(Text, nullable=True)
+    url_portal_fat = Column(Text, nullable=True)
+
+class User(Base):
+    __tablename__ = "users"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(Text, nullable=False)
+    api_key = Column(Text, unique=True, nullable=False)
+    validade = Column(Date)
+    status = Column(Text, nullable=False, default="Ativo")  # Ativo, Inativo
+    is_admin = Column(Boolean, default=False)  # Admins see all data
+    permitir_protocolo = Column(Boolean, default=False)
+    id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="SET NULL"), nullable=True) # Legacy default
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    convenio_rel = relationship("Convenio", secondary="user_convenios")
+    user_convenios_rel = relationship("UserConvenio", foreign_keys=[UserConvenio.user_id], cascade="all, delete-orphan", overlaps="convenio_rel")
 
 class Carteirinha(Base):
     __tablename__ = "carteirinhas"
+    __table_args__ = {'extend_existing': True}
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
 
     id = Column(Integer, primary_key=True, index=True)
     carteirinha = Column(Text, unique=True, nullable=False)
     paciente = Column(Text)
-    id_paciente = Column(Integer, index=True)
-    codigo_beneficiario = Column(Text, nullable=True)
+    id_paciente = Column(Text, index=True)
+    codigo_beneficiario = Column(Text, nullable=True) # ID of user in external system (e.g., IPASGO)
     status = Column(Text, default="ativo")
     id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="SET NULL"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    is_temporary = Column(Boolean, default=False)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
 
-    jobs = relationship("Job", back_populates="carteirinha_rel")
-    guias = relationship("BaseGuia", back_populates="carteirinha_rel")
-    logs = relationship("Log", back_populates="carteirinha_rel")
+    jobs = relationship("Job", back_populates="carteirinha_rel", cascade="all, delete-orphan")
+    guias = relationship("BaseGuia", back_populates="carteirinha_rel", cascade="all, delete-orphan")
+    logs = relationship("Log", back_populates="carteirinha_rel", cascade="all, delete-orphan")
     convenio_rel = relationship("Convenio")
-
 
 class Job(Base):
     __tablename__ = "jobs"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
-    carteirinha_id = Column(Integer, ForeignKey("carteirinhas.id", ondelete="CASCADE"))
+    carteirinha_id = Column(Integer, ForeignKey("carteirinhas.id", ondelete="CASCADE"), nullable=True)
     id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="SET NULL"), nullable=True)
-    rotina = Column(Text)
-    params = Column(Text, nullable=True)
-    status = Column(Text, nullable=False, default="pending")
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    rotina = Column(Text) # consulta_guias, autorizacao, etc.
+    params = Column(JSONB, nullable=True) # Arbitrary JSON parameters
+    status = Column(Text, nullable=False, default="pending", index=True) # success, pending, processing, error
     attempts = Column(Integer, default=0)
     priority = Column(Integer, default=0)
     depending_id = Column(Integer, ForeignKey("jobs.id", ondelete="SET NULL"), nullable=True)
-    locked_by = Column(Text)
+    locked_by = Column(Text) # Server URL
     timeout = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     carteirinha_rel = relationship("Carteirinha", back_populates="jobs")
-    logs = relationship("Log", back_populates="job_rel")
-
+    convenio_rel = relationship("Convenio")
+    logs = relationship("Log", back_populates="job_rel", cascade="all, delete-orphan")
 
 class BaseGuia(Base):
     __tablename__ = "base_guias"
+    __table_args__ = {'extend_existing': True}
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
 
     id = Column(Integer, primary_key=True, index=True)
     carteirinha_id = Column(Integer, ForeignKey("carteirinhas.id", ondelete="CASCADE"))
     id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="SET NULL"), nullable=True)
+    cod_prestador = Column(Text, nullable=True)
+    codigo_beneficiario = Column(Text, nullable=True) # Used for link resolution in IPASGO trigger
     guia = Column(Text)
-    guia_prestador = Column(Text, nullable=True)  # NumeroGuiaPrestador from IPASGO API
-    codigo_beneficiario = Column(Text, nullable=True)
+    guia_prestador = Column(Text, nullable=True)
+    data_solicitacao = Column(Date, nullable=True)
     data_autorizacao = Column(Date)
     senha = Column(Text)
     status_guia = Column(Text, default="Autorizado")
     validade = Column(Date)
     codigo_terapia = Column(Text)
-    nome_terapia = Column(Text, nullable=True)
+    nome_terapia = Column(Text, nullable=True) # Auto-resolved from procedimentos by Trigger
     qtde_solicitada = Column(Integer)
     sessoes_autorizadas = Column(Integer)
+    sessoes_realizadas = Column(Integer)
+    saldo = Column(Integer, default=0, nullable=False)
     timestamp_captura = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     carteirinha_rel = relationship("Carteirinha", back_populates="guias")
+    convenio_rel = relationship("Convenio")
+
+class PeiTemp(Base):
+    __tablename__ = "pei_temp"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(Integer, primary_key=True, index=True)
+    base_guia_id = Column(Integer, ForeignKey("base_guias.id", ondelete="CASCADE"), unique=True)
+    pei_semanal = Column(Float)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class PatientPei(Base):
+    __tablename__ = "patient_pei"
+    __table_args__ = {'extend_existing': True}
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+
+    id = Column(Integer, primary_key=True, index=True)
+    carteirinha_id = Column(Integer, ForeignKey("carteirinhas.id", ondelete="CASCADE"))
+    codigo_terapia = Column(Text)
+    
+    base_guia_id = Column(Integer, ForeignKey("base_guias.id", ondelete="CASCADE"))
+    
+    pei_semanal = Column(Float)
+    validade = Column(Date)
+    status = Column(Text) # Validated, Pendente
+    
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    carteirinha_rel = relationship("Carteirinha")
+    base_guia_rel = relationship("BaseGuia")
 
 
 class Log(Base):
     __tablename__ = "logs"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     job_id = Column(Integer, ForeignKey("jobs.id", ondelete="SET NULL"), nullable=True)
-    carteirinha_id = Column(Integer, ForeignKey("carteirinhas.id", ondelete="SET NULL"), nullable=True)
-    level = Column(Text, default="INFO")  # INFO, WARN, ERROR
+    carteirinha_id = Column(Integer, ForeignKey("carteirinhas.id", ondelete="Set NULL"), nullable=True)
+    level = Column(Text, default="INFO") # INFO, WARN, ERROR
     message = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     job_rel = relationship("Job", back_populates="logs")
     carteirinha_rel = relationship("Carteirinha", back_populates="logs")
 
+class Worker(Base):
+    __tablename__ = "workers"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(Integer, primary_key=True, index=True)
+    hostname = Column(Text, unique=True, nullable=False)
+    status = Column(Text, default="offline") # idle, processing, offline, error
+    last_heartbeat = Column(DateTime(timezone=True), server_default=func.now())
+    current_job_id = Column(Integer, ForeignKey("jobs.id", ondelete="SET NULL"), nullable=True)
+    command = Column(Text, nullable=True) # restart, stop, etc.
+    meta = Column(Text, nullable=True) # JSON string for CPU, RAM, Version
+    first_error_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    current_job = relationship("Job")
+
+# Update relationships in Job and Carteirinha (monkey-patching or manual update below)
+# We need to add 'logs' relationship to Job and Carteirinha classes above.
+# Ideally I should have edited the classes. I will use a second tool call or try to match nicely.
+# Actually I can't easily monkeypatch via replace inside the file text easily if I don't touch the classes.
+# I will rewrite the file segments for Job and Carteirinha to include 'logs = relationship(...)'
+
+
+# Event Listeners for Automatic PEI Calculation
+from sqlalchemy import event
+from sqlalchemy.orm import Session
+
+
+
+
 class Convenio(Base):
     __tablename__ = "convenios"
+    __table_args__ = {'extend_existing': True}
 
     id_convenio = Column(Integer, primary_key=True, index=True)
     nome = Column(Text, nullable=False)
-    usuario = Column(Text)
-    senha_criptografada = Column(Text)
+    digitos_carteirinha = Column(Integer, nullable=True)
     biometria = Column(Boolean, default=False)
     timeout_captura = Column(Boolean, default=False)
     pei_automatico = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+    operacoes_rel = relationship("ConvenioOperacao", back_populates="convenio_rel", cascade="all, delete-orphan")
+
+class ConvenioOperacao(Base):
+    __tablename__ = "convenio_operacoes"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(Integer, primary_key=True, index=True)
+    id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="CASCADE"))
+    descricao = Column(Text, nullable=False)
+    valor = Column(Text, nullable=False)
+    
+    convenio_rel = relationship("Convenio", back_populates="operacoes_rel")
+
+# Event Listeners removed - Replaced by Database Triggers (migrations/0006)
+
 class PriorityRule(Base):
     __tablename__ = "priority_rules"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="CASCADE"))
     rotina = Column(Text)
-    base_priority = Column(Integer, default=1)
-    weight_per_day = Column(Text)
-    is_active = Column(Boolean, default=True)
+    base_priority = Column(Integer, default=2)  # Starting priority level (0 = highest)
+    escalation_minutes = Column(Integer, default=10)  # Minutes per priority step-up towards 0
+    weight_per_day = Column(Text)  # Legacy field kept for backward compat
+    is_active = Column(Integer, default=1)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     convenio_rel = relationship("Convenio")
 
+
+class ServerConfig(Base):
+    """
+    Soft-preference rules for worker servers.
+    The dispatcher gives a bonus to a server when it receives a job matching
+    its preferred (id_convenio, rotina), maximising Chrome session reuse.
+    """
+    __tablename__ = "server_configs"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(Integer, primary_key=True, index=True)
+    server_url = Column(Text, unique=True, nullable=False)  # e.g. "http://127.0.0.1:9000"
+    id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="SET NULL"), nullable=True)
+    rotina = Column(Text, nullable=True)  # NULL = any rotina for preferred convenio
+    preference_bonus = Column(Integer, default=1)  # points subtracted from effective_priority for matching jobs
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    convenio_rel = relationship("Convenio", foreign_keys=[id_convenio])
+
 class JobExecution(Base):
     __tablename__ = "job_executions"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     job_id = Column(Integer, ForeignKey("jobs.id", ondelete="CASCADE"))
@@ -126,15 +271,19 @@ class JobExecution(Base):
     items_found = Column(Integer, default=0)
     error_category = Column(Text)
     error_message = Column(Text)
+    
+    from sqlalchemy.dialects.postgresql import JSONB
+    meta = Column(JSONB)
 
     job_rel = relationship("Job")
     convenio_rel = relationship("Convenio")
 
 class Ficha(Base):
     __tablename__ = "fichas"
+    __table_args__ = {'extend_existing': True}
 
     id_ficha = Column(Integer, primary_key=True, index=True)
-    id_paciente = Column(Integer)
+    id_paciente = Column(Text)
     id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="CASCADE"))
     id_procedimento = Column(Integer, ForeignKey("procedimentos.id_procedimento"))
     id_guia = Column(Integer, ForeignKey("base_guias.id"))
@@ -147,6 +296,7 @@ class Ficha(Base):
 
 class TipoFaturamento(Base):
     __tablename__ = "tipo_faturamento"
+    __table_args__ = {'extend_existing': True}
 
     id_tipo = Column(Integer, primary_key=True, index=True)
     tipo = Column(Text)
@@ -155,6 +305,7 @@ class TipoFaturamento(Base):
 
 class TipoDocumento(Base):
     __tablename__ = "tipo_documentos"
+    __table_args__ = {'extend_existing': True}
 
     id_tipo_doc = Column(Integer, primary_key=True, index=True)
     nome = Column(Text)
@@ -162,6 +313,7 @@ class TipoDocumento(Base):
 
 class ModeloDocumento(Base):
     __tablename__ = "modelo_documentos"
+    __table_args__ = {'extend_existing': True}
 
     id_modelo = Column(Integer, primary_key=True, index=True)
     id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="CASCADE"))
@@ -173,16 +325,22 @@ class ModeloDocumento(Base):
 
 class Procedimento(Base):
     __tablename__ = "procedimentos"
+    __table_args__ = {'extend_existing': True}
 
     id_procedimento = Column(Integer, primary_key=True, index=True)
     nome = Column(Text)
     codigo_procedimento = Column(Text)
-    autorizacao = Column(Text)
     faturamento = Column(Text)
     status = Column(Text, default="ativo")
+    id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="SET NULL"), nullable=True)
+    id_area = Column(Integer, ForeignKey("areas_atuacao.id_area", ondelete="SET NULL"), nullable=True)
+
+    convenio_rel = relationship("Convenio")
+    area_rel = relationship("AreaAtuacao")
 
 class ProcedimentoFaturamento(Base):
     __tablename__ = "procedimento_faturamento"
+    __table_args__ = {'extend_existing': True}
 
     id_proc_fat = Column(Integer, primary_key=True, index=True)
     id_procedimento = Column(Integer, ForeignKey("procedimentos.id_procedimento", ondelete="CASCADE"))
@@ -195,14 +353,72 @@ class ProcedimentoFaturamento(Base):
     procedimento_rel = relationship("Procedimento")
     convenio_rel = relationship("Convenio")
 
-class Area(Base):
-    __tablename__ = "areas"
+class AreaAtuacao(Base):
+    __tablename__ = "areas_atuacao"
+    __table_args__ = {'extend_existing': True}
 
     id_area = Column(Integer, primary_key=True, index=True)
     nome = Column(Text, nullable=False)
+    cbo = Column(Text)
+    status = Column(Text, default="ativo")
+
+class Conselho(Base):
+    __tablename__ = "conselhos"
+    __table_args__ = {'extend_existing': True}
+
+    id_conselho = Column(Integer, primary_key=True, index=True)
+    nome_conselho = Column(Text, nullable=False)
+
+class CorpoClinico(Base):
+    __tablename__ = "corpo_clinico"
+    __table_args__ = {'extend_existing': True}
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+
+    id_profissional = Column(Integer, primary_key=True, index=True)
+    nome = Column(Text, nullable=False)
+    cpf = Column(Text)
+    area = Column(Text)
+    conselho = Column(Text)
+    registro = Column(Text)
+    UF = Column(Text)
+    CBO = Column(Text)
+    codigo_ipasgo = Column(Text)
+    status = Column(Text, default="ativo")
+
+class Agendamento(Base):
+    __tablename__ = "agendamentos"
+    __table_args__ = {'extend_existing': True}
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+
+    id_agendamento = Column(Integer, primary_key=True, index=True)
+    id_paciente = Column(Text)
+    id_unidade = Column(Integer)
+    id_carteirinha = Column(Integer)
+    carteirinha = Column(Text)
+    Nome_Paciente = Column(Text)
+    id_convenio = Column(Integer)
+    nome_convenio = Column(Text)
+    cod_prestador = Column(Text, nullable=True)
+    data = Column(Date)
+    hora_inicio = Column(Time)
+    sala = Column(Text)
+    Id_profissional = Column(Integer)
+    Nome_profissional = Column(Text)
+    Tipo_atendimento = Column(Text)
+    id_procedimento = Column(Integer)
+    cod_procedimento_fat = Column(Text)
+    nome_procedimento = Column(Text)
+    valor_procedimento = Column(Float)
+    cod_procedimento_aut = Column(Text)
+    numero_guia = Column(Text, nullable=True)
+    data_update = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    Status = Column(Text, nullable=False, default="A Confirmar")
+    execucao_status = Column(Text, default="pendente")
 
 class FaturamentoLote(Base):
     __tablename__ = "faturamento_lotes"
+    __table_args__ = {'extend_existing': True}
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
 
     id = Column(Integer, primary_key=True, index=True)
     id_lote = Column(Integer, ForeignKey("lotes_convenio.id_lote", ondelete="SET NULL"), index=True)
@@ -213,14 +429,18 @@ class FaturamentoLote(Base):
     Guia = Column(Text)
     StatusConferencia = Column(Integer)
     ValorProcedimento = Column(Float)
+    cod_procedimento_fat = Column(Text, nullable=True)
+    agendamento_id = Column(Integer, ForeignKey("agendamentos.id_agendamento", ondelete="SET NULL"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 class LoteConvenio(Base):
     __tablename__ = "lotes_convenio"
+    __table_args__ = {'extend_existing': True}
 
     id_lote = Column(Integer, primary_key=True, index=True)
     id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="CASCADE"))
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     numero_lote = Column(Integer, index=True)
     cod_prestador = Column(Text)
     status = Column(Text, default="Aberto") # Aberto, Enviado, Cancelado
@@ -231,3 +451,80 @@ class LoteConvenio(Base):
     
     convenio_rel = relationship("Convenio")
 
+class LoteAgendamento(Base):
+    __tablename__ = "lotes_agendamento"
+    __table_args__ = {'extend_existing': True}
+
+    id_lote_ag = Column(Integer, primary_key=True, index=True)
+    id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="CASCADE"))
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    id_lote_convenio = Column(Integer, ForeignKey("lotes_convenio.id_lote", ondelete="SET NULL"), nullable=True, index=True)
+    data_inicio = Column(Date)
+    data_fim = Column(Date)
+    status = Column(Text, default="Aberto")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    convenio_rel = relationship("Convenio")
+
+class LoteAgendamentoItem(Base):
+    __tablename__ = "lote_agendamento_itens"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(Integer, primary_key=True, index=True)
+    id_lote_ag = Column(Integer, ForeignKey("lotes_agendamento.id_lote_ag", ondelete="CASCADE"), index=True)
+    id_agendamento = Column(Integer, ForeignKey("agendamentos.id_agendamento", ondelete="CASCADE"), index=True)
+    status_conciliacao = Column(Text, default="Não Conciliado")
+    id_faturamento_lote = Column(Integer, ForeignKey("faturamento_lotes.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class ProtocoloLote(Base):
+    """Batch (lote) of PDF files for extraction processing."""
+    __tablename__ = "protocolo_lotes"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    status = Column(Text, nullable=False, default="pending", index=True)  # pending, processing, completed, error
+    total_arquivos = Column(Integer, default=0)
+    total_processado = Column(Integer, default=0)
+    total_erro = Column(Integer, default=0)
+    total_sucesso = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    arquivos = relationship("ProtocoloArquivo", back_populates="lote_rel", cascade="all, delete-orphan")
+
+
+class ProtocoloArquivo(Base):
+    """Individual PDF file within a processing batch."""
+    __tablename__ = "protocolo_arquivos"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(Integer, primary_key=True, index=True)
+    lote_id = Column(Integer, ForeignKey("protocolo_lotes.id", ondelete="CASCADE"), nullable=False, index=True)
+    nome_original = Column(Text, nullable=False)
+    nome_final = Column(Text)
+    status = Column(Text, nullable=False, default="pendente", index=True)  # pendente, processando, sucesso, erro, revisao
+    tamanho_bytes = Column(Integer, default=0)
+
+    # Extracted data from Gemini
+    numero_guia_prestador = Column(Text)
+    nome_beneficiario = Column(Text)
+    numero_guia_principal = Column(Text)
+    atendimentos = Column(JSON, nullable=True)  # [{data, assinatura}, ...]
+
+    # Post-processing data
+    guia_normalizada = Column(Text)
+    erro_mensagem = Column(Text)
+    gemini_model_used = Column(Text)
+    gemini_api_key_index = Column(Integer)
+
+    # Physical file paths
+    caminho_original = Column(Text)
+    caminho_final = Column(Text)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    lote_rel = relationship("ProtocoloLote", back_populates="arquivos")

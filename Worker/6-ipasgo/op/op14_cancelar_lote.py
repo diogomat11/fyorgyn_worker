@@ -14,7 +14,7 @@ def run(scraper, job_data):
     """
     driver = scraper.driver
     job_id = job_data.get("job_id")
-    cod_prestador = job_data.get("cod_prestador")
+    cod_prestador = job_data.get("cod_prestador") or job_data.get("codigoPrestador") or getattr(scraper, "cod_prestador", "")
     numero_lote = job_data.get("numero_lote")
     id_lote_interno = job_data.get("id_lote_interno")
     
@@ -26,9 +26,47 @@ def run(scraper, job_data):
     # 1. Garante navegação inicial
     faturamento_url = "https://novowebplanipasgo.facilinformatica.com.br/GuiasTISS/FaturamentoAtendimentos"
     scraper.log(f"OP14 - Navegando para URL de Faturamento: {faturamento_url}", job_id=job_id)
-    driver.get(faturamento_url)
+    
+    # Fechar possíveis alertas antes de navegar
+    try:
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        WebDriverWait(driver, 2).until(EC.alert_is_present())
+        driver.switch_to.alert.accept()
+    except:
+        pass
+        
+    # Aguarda a aba do WebPlan estabilizar após o login (SSO) antes de forçar a URL
+    from time import sleep
+    for _ in range(10):
+        try:
+            if driver.execute_script("return document.readyState;") == "complete":
+                if "facilinformatica" in driver.current_url.lower():
+                    break
+        except:
+            pass
+        sleep(1)
+        
+    try:
+        driver.get(faturamento_url)
+    except Exception as e:
+        scraper.log(f"Aviso ao navegar (pode ser alert block): {e}", level="WARN", job_id=job_id)
+        try:
+            driver.switch_to.alert.accept()
+            driver.get(faturamento_url)
+        except:
+            pass
     
     from time import sleep
+    
+    # Aguardar carregamento completo da página
+    for _ in range(10):
+        try:
+            if driver.execute_script("return document.readyState;") == "complete":
+                break
+        except:
+            pass
+        sleep(1)
     sleep(3)
     
     client = WebPlanClient(driver)

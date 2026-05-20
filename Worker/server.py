@@ -54,6 +54,7 @@ class JobRequest(BaseModel):
     paciente: str = ""
     start_date: str = None
     end_date: str = None
+    user_id: Optional[int] = None
 
     def get_params_str(self) -> Optional[str]:
         """Always returns params as a JSON string or None."""
@@ -100,8 +101,16 @@ def process_job(job: JobRequest):
         driver = sel_manager.get_driver(job.id_convenio, headless=is_headless)
         
         # 2. Get Scraper Instance (generic — determined by job.id_convenio)
-        scraper = ScraperFactory.get_scraper(job.id_convenio, db=db, headless=is_headless)
+        scraper = ScraperFactory.get_scraper(job.id_convenio, db=db, headless=is_headless, user_id=job.user_id)
         scraper.driver = driver  # Inject driver
+        
+        # 3. Force-reload credentials for this specific tenant job
+        # The scraper may be created fresh each time, but if job.user_id differs from what was
+        # set at __init__ time (e.g. due to module caching), reload_credentials ensures correctness.
+        if job.user_id and hasattr(scraper, 'reload_credentials'):
+            if getattr(scraper, 'user_id', None) != job.user_id or not getattr(scraper, 'username', None):
+                print(f">>> Reloading credentials for user_id={job.user_id} (scraper had user_id={getattr(scraper, 'user_id', None)})")
+                scraper.reload_credentials(job.user_id)
         
         # 3. Process
         print(f">>> Starting routine {job.rotina}...")
@@ -118,6 +127,12 @@ def process_job(job: JobRequest):
                 carteirinha_db_id=job.carteirinha_id
              )
              
+        # Handle both list (normal ops) and dict (self-persisting ops like OP6)
+        if isinstance(results, dict) and results.get("self_persisted"):
+            meta = results
+            print(f">>> Job {job.job_id} self-persisted: {meta.get('inserted', 0)} inserted, {meta.get('updated', 0)} updated")
+            return {"status": "success", "data": [], "meta": meta, "job_id": job.job_id}
+        
         print(f">>> Returning {len(results) if results else 0} items for Job {job.job_id}")
         return {"status": "success", "data": results, "job_id": job.job_id}
         

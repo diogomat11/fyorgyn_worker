@@ -181,7 +181,7 @@ def _close_notification_robust(driver, scraper=None, job_id=None):
     return False
 
 
-def _save_rows_local(rows, logger):
+def _save_rows_local(rows, logger, job_user_id=None):
     try:
         from database import SessionLocal
         from models import BaseGuia, Carteirinha
@@ -198,13 +198,14 @@ def _save_rows_local(rows, logger):
                 cod_terapia = row_data.get("codigo_terapia") or ""
                 
                 # ── Busca em 2 fases para evitar duplicatas ──
-                # Fase 1: Match exato (guia + codigo_terapia + id_convenio)
+                # Fase 1: Match exato (guia + codigo_terapia + id_convenio + user_id)
                 guia_record = None
                 if cod_terapia:
                     guia_record = db_session.query(BaseGuia).filter(
                         BaseGuia.guia == guia_num,
                         BaseGuia.id_convenio == 6,
-                        BaseGuia.codigo_terapia == cod_terapia
+                        BaseGuia.codigo_terapia == cod_terapia,
+                        BaseGuia.user_id == job_user_id
                     ).first()
                 
                 # Fase 2: Fallback — registro existente com codigo_terapia NULL/vazio
@@ -213,6 +214,7 @@ def _save_rows_local(rows, logger):
                     guia_record = db_session.query(BaseGuia).filter(
                         BaseGuia.guia == guia_num,
                         BaseGuia.id_convenio == 6,
+                        BaseGuia.user_id == job_user_id,
                         or_(
                             BaseGuia.codigo_terapia == None,
                             BaseGuia.codigo_terapia == ""
@@ -223,7 +225,8 @@ def _save_rows_local(rows, logger):
                     guia_record = BaseGuia(
                         guia=guia_num,
                         codigo_terapia=cod_terapia,
-                        id_convenio=6
+                        id_convenio=6,
+                        user_id=job_user_id
                     )
                     db_session.add(guia_record)
                     count_inserted += 1
@@ -242,6 +245,9 @@ def _save_rows_local(rows, logger):
                 
                 if row_data.get("data_autorizacao"):
                     guia_record.data_autorizacao = row_data["data_autorizacao"]
+                
+                if row_data.get("data_solicitacao"):
+                    guia_record.data_solicitacao = row_data["data_solicitacao"]
                 
                 if row_data.get("validade"):
                     guia_record.validade = row_data["validade"]
@@ -276,7 +282,10 @@ def run(scraper, job_data):
     job_id = job_data.get("job_id")
     
     # Extração de parâmetros (com .strip() defensivo contra \r\n do frontend)
-    codigo_prestador = job_data.get("codigoPrestador", "").strip()
+    codigo_prestador = job_data.get("codigoPrestador", "").strip() or getattr(scraper, "cod_prestador", "")
+    
+    if not codigo_prestador:
+        raise ValueError("O código do prestador não foi informado (payload vazio) e não foi encontrado na tabela user_convenios.")
     carteira = job_data.get("carteira", "").strip()
     codigo_beneficiario = job_data.get("codigoBeneficiario", "").strip()
     guia_str = job_data.get("guia", "").strip()
@@ -386,6 +395,9 @@ def run(scraper, job_data):
             
             data_autorizacao = _parse_aspnet_date(item.get("DtLiberacao"))
             
+            raw_solic = item.get("DadosParaDtLiberacaoTela")
+            data_solicitacao = _parse_aspnet_date(raw_solic[:10]) if raw_solic and isinstance(raw_solic, str) else None
+            
             senha = item.get("Senha") or ""
             if isinstance(senha, str):
                 senha = senha.strip()
@@ -434,6 +446,7 @@ def run(scraper, job_data):
                     "guia_prestador": numero_guia_prestador,
                     "status_guia": status_guia,
                     "codigo_terapia": codigo_terapia,
+                    "data_solicitacao": data_solicitacao,
                     "data_autorizacao": data_autorizacao,
                     "senha": senha,
                     "validade": validade,
@@ -451,6 +464,6 @@ def run(scraper, job_data):
     scraper.log(f"OP11 - Extração concluída. Total de linhas (guia+procedimento): {len(todas_guias_extraidas)}", job_id=job_id)
     
     # 4. Persistência — Upsert por chave composta (guia + codigo_terapia + id_convenio)
-    _save_rows_local(todas_guias_extraidas, scraper.logger if hasattr(scraper, 'logger') else logging.getLogger())
+    _save_rows_local(todas_guias_extraidas, scraper.logger if hasattr(scraper, 'logger') else logging.getLogger(), job_user_id=getattr(scraper, 'user_id', None))
     
     return todas_guias_extraidas

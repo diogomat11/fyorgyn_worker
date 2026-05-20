@@ -14,7 +14,7 @@ class SeleniumManager:
         self.last_activity = {} # convenio_id -> datetime
         self.max_drivers = max_drivers
         self.lock = threading.Lock()
-        self.inactivity_limit = timedelta(minutes=20)
+        self.inactivity_limit = timedelta(minutes=10) # Reduzido para 10 min por exigência de segurança (ex: Bradesco)
 
     def get_driver(self, id_convenio, headless=True):
         with self.lock:
@@ -58,6 +58,15 @@ class SeleniumManager:
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--kiosk-printing")
+        chrome_options.add_argument("--disable-features=PasswordLeakDetection")
+        chrome_options.add_argument("--incognito")  # Impede balões nativos de "Salvar Senha" ou "Senha Vazada"
+        
+        # Desativar prompts de salvar senha do navegador
+        prefs = {
+            "credentials_enable_service": False,
+            "profile.password_manager_enabled": False
+        }
+        chrome_options.add_experimental_option("prefs", prefs)
         if headless:
             chrome_options.add_argument("--headless")
         
@@ -76,8 +85,20 @@ class SeleniumManager:
     def close_driver(self, id_convenio):
         # Already assume we have the lock or it's called internally
         if id_convenio in self.drivers:
+            driver = self.drivers[id_convenio]
             try:
-                self.drivers[id_convenio].quit()
+                # Logoff gracioso para convênios sensíveis a sessão presa (ex: Bradesco)
+                if id_convenio == 1 and self._is_alive(driver):
+                    try:
+                        from selenium.webdriver.common.by import By
+                        sair_btn = driver.find_elements(By.ID, "sair")
+                        if sair_btn:
+                            sair_btn[0].click()
+                            time.sleep(2) # Aguarda o servidor registrar o logoff
+                    except Exception as logoff_err:
+                        print(f">>> Erro no logoff gracioso do Bradesco: {logoff_err}")
+                        
+                driver.quit()
             except:
                 pass
             del self.drivers[id_convenio]

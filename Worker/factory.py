@@ -7,15 +7,22 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 class ScraperFactory:
     @staticmethod
-    def get_scraper(id_convenio, db=None, headless=True):
+    def get_scraper(id_convenio, db=None, headless=True, user_id=None):
         worker_dir = os.path.dirname(os.path.abspath(__file__))
         
-        if id_convenio == 6: # IPASGO
+        if id_convenio == 1: # BRADESCO
+             target_file = os.path.join(worker_dir, "1-bradesco", "core", "scraper.py")
+             spec = importlib.util.spec_from_file_location("bradesco_scraper", target_file)
+             bradesco_module = importlib.util.module_from_spec(spec)
+             spec.loader.exec_module(bradesco_module)
+             return bradesco_module.BradescoScraper(id_convenio=id_convenio, db=db, headless=headless, user_id=user_id)
+
+        elif id_convenio == 6: # IPASGO
              target_file = os.path.join(worker_dir, "6-ipasgo", "core", "scraper.py")
              spec = importlib.util.spec_from_file_location("ipasgo_scraper", target_file)
              ipasgo_module = importlib.util.module_from_spec(spec)
              spec.loader.exec_module(ipasgo_module)
-             return ipasgo_module.IpasgoScraper(id_convenio=id_convenio, db=db, headless=headless)
+             return ipasgo_module.IpasgoScraper(id_convenio=id_convenio, db=db, headless=headless, user_id=user_id)
              
         elif id_convenio == 2: # UNIMED ANAPOLIS
              target_file = os.path.join(worker_dir, "2-unimed_anapolis", "core", "scraper.py")

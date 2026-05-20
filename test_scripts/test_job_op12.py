@@ -18,8 +18,8 @@ def test_op12_impressao():
         "operation": 12, # OP12
         "convenio_id": 6, # IPASGO
         "params": json.dumps({
-            "guia": "22404010376",           # NumGuiaOperadora (Mock)
-            "GuiaPrestador": "22404010376",  # NumGuiaPrestador (Mock)
+            "guia": "22112786",           # NumGuiaOperadora (Mock)
+            "GuiaPrestador": "00632220042617555801",  # NumGuiaPrestador (Mock)
             "numero_copias": 1
         })
     }
