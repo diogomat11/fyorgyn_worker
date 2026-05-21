@@ -81,9 +81,28 @@ class BradescoScraper(BaseScraper):
     def close_driver(self):
         pass  # Managed by SeleniumManager
 
-    def log(self, message, level="INFO", job_id=None):
+    def log(self, message, level="INFO", job_id=None, carteirinha_id=None):
         job_prefix = f"[Job {job_id}] " if job_id else ""
         print(f"[{level}] [BRADESCO] {job_prefix}{message}")
+        # Persist to database logs table for frontend visibility
+        try:
+            if self.db:
+                from models import Log as LogModel
+                log_entry = LogModel(
+                    job_id=job_id,
+                    carteirinha_id=carteirinha_id,
+                    level=level,
+                    message=f"[BRADESCO] {message}"
+                )
+                self.db.add(log_entry)
+                self.db.commit()
+        except Exception as e:
+            # Never let a logging failure break the scraper flow
+            print(f"[WARN] [BRADESCO] Failed to persist log to DB: {e}")
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
 
     def login(self, job_data=None):
         """Executes OP0 login routine."""

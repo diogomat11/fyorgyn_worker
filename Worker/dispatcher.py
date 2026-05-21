@@ -373,13 +373,15 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
             params_dict = params if isinstance(params, dict) else (_json.loads(params) if params else {})
             
             # Inject credentials directly into params for Bradesco to avoid double-fetching and ensure they arrive in the payload
+            # Only inject if login/senha_criptografada are not already provided in the parameters
             if id_convenio == 1 and user_id:
-                from models import UserConvenio
-                uconv = db.query(UserConvenio).filter(UserConvenio.user_id == user_id, UserConvenio.id_convenio == 1).first()
-                if uconv:
-                    params_dict["login"] = uconv.login
-                    params_dict["senha_criptografada"] = uconv.senha_criptografada
-                    params_dict["cod_prestador"] = uconv.cod_prestador
+                if not params_dict.get("login") or not params_dict.get("senha_criptografada"):
+                    from models import UserConvenio
+                    uconv = db.query(UserConvenio).filter(UserConvenio.user_id == user_id, UserConvenio.id_convenio == 1).first()
+                    if uconv:
+                        params_dict["login"] = uconv.login
+                        params_dict["senha_criptografada"] = uconv.senha_criptografada
+                        params_dict["cod_prestador"] = uconv.cod_prestador
                     
             params_str = _json.dumps(params_dict)
 
@@ -432,6 +434,15 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 current_job.locked_by = None
                 current_job.updated_at = datetime.now(timezone.utc)
                 results = data.get("data", [])
+                
+                # ── Log the full JSON response from the worker ──
+                try:
+                    result_json_str = _json.dumps(data, ensure_ascii=False, default=str)[:2000]
+                    db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, level="INFO",
+                              message=f"Worker JSON Response: {result_json_str}"))
+                    db.commit()
+                except Exception:
+                    pass
                 
                 try:
                     # Check if the worker already persisted data internally (OP6, OP7, etc.)
@@ -606,6 +617,14 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 # Regra de Negócio PO: Interromper Retentativas para erros Fatais (Carteira Inválida)
                 if "carteira inv" in err_msg.lower() or "dígito" in err_msg.lower() or "invalida" in err_msg.lower():
                     current_job.attempts = max(3, current_job.attempts)
+                
+                # Log the full JSON response for debugging
+                try:
+                    err_json_str = _json.dumps(data, ensure_ascii=False, default=str)[:2000]
+                    db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, level="ERROR",
+                              message=f"Worker JSON Response (Error): {err_json_str}"))
+                except Exception:
+                    pass
                     
                 db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, level="ERROR", message=f"Worker Error: {err_msg}"))
             

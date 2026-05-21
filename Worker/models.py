@@ -528,3 +528,34 @@ class ProtocoloArquivo(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     lote_rel = relationship("ProtocoloLote", back_populates="arquivos")
+
+
+class RelatorioMedicoExtracao(Base):
+    __tablename__ = "relatorios_medicos_extracao"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    id_paciente = Column(Text, nullable=False, index=True)
+    nome_paciente = Column(Text)
+    id_relatorio = Column(Text)
+    url_arquivo = Column(Text)
+
+    # Cargas horárias por área terapêutica
+    carga_psicologia = Column(Integer)
+    carga_fisioterapia = Column(Integer)
+    carga_terapia_ocupacional = Column(Integer)
+    carga_psicopedagogia = Column(Integer)
+    carga_fonoaudiologia = Column(Integer)
+    carga_psicomotricidade = Column(Integer)
+    carga_musicoterapia = Column(Integer)
+    carga_avaliacao_neuropsicologica = Column(Integer)
+
+    # Metadados da extração
+    tipo_carga_horaria = Column(String(20))
+    status_extracao = Column(String(20), nullable=False, default="NAO_EXTRAIDO", index=True)
+    itens_ignorados = Column(JSON)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
