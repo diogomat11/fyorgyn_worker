@@ -17,7 +17,7 @@ from database import SessionLocal
 
 class IpasgoScraper(BaseScraper):
     def __init__(self, id_convenio=6, db=None, headless=True, user_id=None):
-        super().__init__(id_convenio, db, headless)
+        super().__init__(id_convenio, db, headless, user_id)
         # Use provided DB or create a fresh local session
         self.db = db if db else SessionLocal()
         self.user_id = user_id  # Owner do job atual
@@ -69,9 +69,24 @@ class IpasgoScraper(BaseScraper):
     def close_driver(self):
         pass # Managed by SeleniumManager
 
-    def log(self, message, level="INFO", job_id=None):
+    def log(self, message, level="INFO", job_id=None, carteirinha_id=None):
         job_prefix = f"[Job {job_id}] " if job_id else ""
         print(f"[{level}] {job_prefix}{message}")
+        if self.db:
+            try:
+                from models import Log as LogModel
+                log_entry = LogModel(
+                    job_id=job_id,
+                    carteirinha_id=carteirinha_id,
+                    user_id=self.user_id,
+                    level=level,
+                    message=f"[IPASGO] {message}"
+                )
+                self.db.add(log_entry)
+                self.db.commit()
+            except Exception:
+                try: self.db.rollback()
+                except: pass
 
     def login(self):
         """Executes OP0 login routine."""

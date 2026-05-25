@@ -20,9 +20,10 @@ from security_utils import decrypt_password
 from base_scraper import BaseScraper
 
 class UnimedScraper(BaseScraper):
-    def __init__(self, id_convenio=None, db: Session = None, headless=True):
-        super().__init__(id_convenio, db, headless)
+    def __init__(self, id_convenio=None, db: Session = None, headless=True, user_id=None):
+        super().__init__(id_convenio, db, headless, user_id)
         self.db = db
+        self.user_id = user_id
         
         # Credentials loaded exclusively from DB (convenios table)
         self.username = None
@@ -54,6 +55,7 @@ class UnimedScraper(BaseScraper):
                 log_entry = Log(
                     job_id=job_id,
                     carteirinha_id=carteirinha_id,
+                    user_id=self.user_id,
                     level=level,
                     message=message
                 )

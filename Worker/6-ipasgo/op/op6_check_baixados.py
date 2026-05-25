@@ -243,6 +243,8 @@ def run(scraper, job_data):
 
 
                 # Aplicar novos valores do IPASGO
+                if getattr(existing, 'user_id', None) is None:
+                    existing.user_id = getattr(scraper, 'user_id', None)
                 existing.dataRealizacao = new_data_realizacao
                 existing.Guia = str(item['Guia']) if item.get('Guia') else ''
                 existing.StatusConferencia = new_status

@@ -396,7 +396,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 "user_id": user_id
             }
             # Log attempt
-            db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, level="INFO", message=f"Dispatching to {url}"))
+            db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="INFO", message=f"Dispatching to {url}"))
             db.commit()
 
             # Close DB connection to free Supabase pool during long HTTP wait (up to 300s)
@@ -412,7 +412,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 data = resp.json()
             except ValueError: 
                 err_msg = f"Invalid JSON ({resp.status_code}): {resp.text[:200]}"
-                db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, level="ERROR", message=f"Worker Protocol Error: {err_msg}"))
+                db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="ERROR", message=f"Worker Protocol Error: {err_msg}"))
                 db.commit()
                 raise Exception(err_msg)
 
@@ -424,7 +424,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 current_job.status = "pending"
                 current_job.locked_by = None
                 current_job.attempts = max(0, current_job.attempts - 1) # Refund the attempt
-                db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, level="WARN", message="Worker Port returned 409 Busy -> Retornando Job para fila Pending."))
+                db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="WARN", message="Worker Port returned 409 Busy -> Retornando Job para fila Pending."))
                 current_job.updated_at = datetime.now(timezone.utc)
                 db.commit()
                 return
@@ -438,7 +438,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 # ── Log the full JSON response from the worker ──
                 try:
                     result_json_str = _json.dumps(data, ensure_ascii=False, default=str)[:2000]
-                    db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, level="INFO",
+                    db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="INFO",
                               message=f"Worker JSON Response: {result_json_str}"))
                     db.commit()
                 except Exception:
@@ -452,11 +452,11 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                         upd = worker_meta.get("updated", 0)
                         tot = worker_meta.get("total", 0)
                         msg = f"Sync complete (Worker). Inserted: {ins}, Updated: {upd}, Total extraídos: {tot}"
-                        db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, level="INFO", message=msg))
+                        db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="INFO", message=msg))
                         db.commit()
                     elif not results:
                         # No results and no self_persisted flag — just log empty sync
-                        db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, level="INFO", message="Sync complete. Inserted: 0, Updated: 0 (Worker retornou vazio)"))
+                        db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="INFO", message="Sync complete. Inserted: 0, Updated: 0 (Worker retornou vazio)"))
                         db.commit()
                     else:
                         count_inserted = 0
@@ -547,6 +547,13 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                                     existing_guia = db.query(BaseGuia).filter(*fallback_filters).first()
 
                                 if existing_guia:
+                                    # Claim ownership or skip if owned by another user
+                                    if existing_guia.user_id is None:
+                                        existing_guia.user_id = user_id
+                                    elif existing_guia.user_id != user_id:
+                                        logger.warning(f"Guia {guia_num} pertence ao usuario {existing_guia.user_id}, mas o job atual e do usuario {user_id}. Atualizacao ignorada.")
+                                        continue
+                                    
                                     existing_guia.data_autorizacao = data_auth_parsed
                                     existing_guia.senha = senha_val
                                     existing_guia.status_guia = status_guia_val
@@ -600,12 +607,12 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                                 ))
                                 db.commit()
 
-                        db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, level="INFO", message=f"Sync complete. Inserted: {count_inserted}, Updated: {count_updated}"))
+                        db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="INFO", message=f"Sync complete. Inserted: {count_inserted}, Updated: {count_updated}"))
                         db.commit()
                 except Exception as save_e:
                     logger.error(f"Error saving results: {save_e}")
                     db.rollback()
-                    db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, level="ERROR", message=f"Error saving results: {save_e}"))
+                    db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="ERROR", message=f"Error saving results: {save_e}"))
                     db.commit()
                     current_job.status = "error"
             else:
@@ -621,12 +628,12 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 # Log the full JSON response for debugging
                 try:
                     err_json_str = _json.dumps(data, ensure_ascii=False, default=str)[:2000]
-                    db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, level="ERROR",
+                    db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="ERROR",
                               message=f"Worker JSON Response (Error): {err_json_str}"))
                 except Exception:
                     pass
                     
-                db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, level="ERROR", message=f"Worker Error: {err_msg}"))
+                db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="ERROR", message=f"Worker Error: {err_msg}"))
             
             db.commit()
             
@@ -638,7 +645,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                     current_job.status = "error"
                     current_job.locked_by = None
                     current_job.updated_at = datetime.now(timezone.utc)
-                    db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, level="ERROR", message="Worker is Offline (Connection Refused)."))
+                    db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="ERROR", message="Worker is Offline (Connection Refused)."))
                     db.commit()
             except: pass
         except Exception as e:
@@ -649,7 +656,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                     current_job.status = "error"
                     current_job.locked_by = None
                     current_job.updated_at = datetime.now(timezone.utc)
-                    db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, level="ERROR", message=f"Dispatcher Failed: {str(e)}"))
+                    db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="ERROR", message=f"Dispatcher Failed: {str(e)}"))
                     db.commit()
             except: pass
         finally:

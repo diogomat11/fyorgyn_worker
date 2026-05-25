@@ -46,9 +46,10 @@ class UnimedAnopolisScraper(BaseScraper):
     URL: https://sgucard.unimedanapolis.com.br
     """
 
-    def __init__(self, id_convenio=None, db: Session = None, headless=True):
-        super().__init__(id_convenio, db, headless)
+    def __init__(self, id_convenio=None, db: Session = None, headless=True, user_id=None):
+        super().__init__(id_convenio, db, headless, user_id)
         self.db = db
+        self.user_id = user_id
 
         # Default fallback (will be overridden by DB)
         self.username = None
@@ -73,7 +74,7 @@ class UnimedAnopolisScraper(BaseScraper):
                 print(f">>> {msg}")
                 if self.db:
                     try:
-                        self.db.add(Log(level="ERROR", message=msg))
+                        self.db.add(Log(level="ERROR", message=msg, user_id=self.user_id))
                         self.db.commit()
                     except: self.db.rollback()
         except Exception as e:
@@ -81,7 +82,7 @@ class UnimedAnopolisScraper(BaseScraper):
             print(f">>> {msg}")
             if self.db:
                 try:
-                    self.db.add(Log(level="ERROR", message=msg))
+                    self.db.add(Log(level="ERROR", message=msg, user_id=self.user_id))
                     self.db.commit()
                 except: self.db.rollback()
 
@@ -95,6 +96,7 @@ class UnimedAnopolisScraper(BaseScraper):
                 self.db.add(Log(
                     job_id=job_id,
                     carteirinha_id=carteirinha_id,
+                    user_id=self.user_id,
                     level=level,
                     message=message
                 ))

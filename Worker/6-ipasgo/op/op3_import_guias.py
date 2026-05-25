@@ -213,7 +213,7 @@ def _formatar_ddmmyyyy(s):
         except Exception:
             return str(s).strip()
 
-def _save_rows_local(rows, logger):
+def _save_rows_local(rows, logger, job_user_id=None):
     try:
         from database import SessionLocal
         from models import BaseGuia, Carteirinha
@@ -221,11 +221,17 @@ def _save_rows_local(rows, logger):
         try:
             for row_data in rows:
                 guia_record = db_session.query(BaseGuia).filter(
-                    BaseGuia.guia == str(row_data["guia"])
+                    BaseGuia.guia == str(row_data["guia"]),
+                    BaseGuia.id_convenio == 6
                 ).first()
                 if not guia_record:
-                    guia_record = BaseGuia(guia=str(row_data["guia"]))
+                    guia_record = BaseGuia(guia=str(row_data["guia"]), user_id=job_user_id)
                     db_session.add(guia_record)
+                else:
+                    if guia_record.user_id is None:
+                        guia_record.user_id = job_user_id
+                    elif guia_record.user_id != job_user_id:
+                        continue
                 
                 guia_record.senha = row_data["senha"]
                 guia_record.status_guia = row_data["status_guia"]
@@ -719,7 +725,7 @@ def run(scraper: 'BaseScraper', job_data: dict) -> list[dict]:
         # enviar por página e registrar log corretamente
         page_rows_complete = [r for r in page_rows if _is_row_complete(r)]
         if page_rows_complete:
-            _save_rows_local(page_rows_complete, logger)
+            _save_rows_local(page_rows_complete, logger, job_user_id=getattr(scraper, 'user_id', None) or job_data.get("user_id"))
         
         # Salvando Estado de Navegação Localmente
         try:

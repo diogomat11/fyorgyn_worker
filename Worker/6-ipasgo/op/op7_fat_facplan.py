@@ -145,6 +145,8 @@ def run(scraper, job_data):
             existing = scraper.db.query(FaturamentoLote).filter_by(detalheId=detalhe_id).first()
             if existing:
                 existing.StatusConferencia = status
+                if getattr(existing, 'user_id', None) is None:
+                    existing.user_id = getattr(scraper, 'user_id', None)
                 if data_realizacao:
                     existing.dataRealizacao = datetime.strptime(data_realizacao, "%d/%m/%Y").date()
                 scraper.db.commit()

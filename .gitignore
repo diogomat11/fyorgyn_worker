@@ -1,0 +1,30 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environments
+.env
+BaseGuias_backend.env
+
+# Logs and Debugs
+*.log
+db_debug_worker.log
+dispatcher_debug.txt
+
+# Databases
+*.db
+worker.db
+
+# PyInstaller / Build
+build/
+dist/
+*.spec
+
+# Scratch files
+scratch/
+test_scripts/

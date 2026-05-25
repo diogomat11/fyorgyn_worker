@@ -204,17 +204,13 @@ def _save_rows_local(rows, logger, job_user_id=None):
                     guia_record = db_session.query(BaseGuia).filter(
                         BaseGuia.guia == guia_num,
                         BaseGuia.id_convenio == 6,
-                        BaseGuia.codigo_terapia == cod_terapia,
-                        BaseGuia.user_id == job_user_id
+                        BaseGuia.codigo_terapia == cod_terapia
                     ).first()
                 
-                # Fase 2: Fallback — registro existente com codigo_terapia NULL/vazio
-                # (criado por OP3 que ainda não tinha o código)
                 if not guia_record:
                     guia_record = db_session.query(BaseGuia).filter(
                         BaseGuia.guia == guia_num,
                         BaseGuia.id_convenio == 6,
-                        BaseGuia.user_id == job_user_id,
                         or_(
                             BaseGuia.codigo_terapia == None,
                             BaseGuia.codigo_terapia == ""
@@ -231,6 +227,10 @@ def _save_rows_local(rows, logger, job_user_id=None):
                     db_session.add(guia_record)
                     count_inserted += 1
                 else:
+                    if guia_record.user_id is None:
+                        guia_record.user_id = job_user_id
+                    elif guia_record.user_id != job_user_id:
+                        continue
                     count_updated += 1
                 
                 guia_record.status_guia = row_data.get("status_guia")

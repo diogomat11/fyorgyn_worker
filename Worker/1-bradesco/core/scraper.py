@@ -23,7 +23,7 @@ class BradescoScraper(BaseScraper):
     """
 
     def __init__(self, id_convenio=1, db=None, headless=True, user_id=None):
-        super().__init__(id_convenio, db, headless)
+        super().__init__(id_convenio, db, headless, user_id)
         self.db = db if db else SessionLocal()
         self.user_id = user_id
         self.username = None
@@ -91,6 +91,7 @@ class BradescoScraper(BaseScraper):
                 log_entry = LogModel(
                     job_id=job_id,
                     carteirinha_id=carteirinha_id,
+                    user_id=self.user_id,
                     level=level,
                     message=f"[BRADESCO] {message}"
                 )
