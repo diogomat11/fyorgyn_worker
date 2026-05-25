@@ -84,7 +84,7 @@ class WebPlanClient:
         
         for attempt in range(3):
             try:
-                resp = self.session.post(url, headers=headers, json=payload, timeout=20)
+                resp = self.session.post(url, headers=headers, json=payload, timeout=60)
                 
                 if 'text/html' in resp.headers.get('Content-Type', ''):
                     raise ValueError(f"Sessão Rejeitada na OP11 (Retornou HTML). Status: {resp.status_code}. URL: {resp.url}")
@@ -133,7 +133,7 @@ class WebPlanClient:
         for attempt in range(3):
             try:
                 # Add timeout para fallback caso o portal trave
-                resp = self.session.post(url, headers=headers, json=payload, timeout=20)
+                resp = self.session.post(url, headers=headers, json=payload, timeout=60)
                 
                 # Facil generally redirects to login if unauth
                 if 'text/html' in resp.headers.get('Content-Type', ''):
@@ -182,7 +182,7 @@ class WebPlanClient:
         
         for attempt in range(3):
             try:
-                resp = self.session.post(url, headers=headers, data=payload, timeout=20)
+                resp = self.session.post(url, headers=headers, data=payload, timeout=60)
                 
                 if 'text/html' in resp.headers.get('Content-Type', ''):
                     if attempt < 2:
@@ -274,7 +274,7 @@ class WebPlanClient:
         
         for attempt in range(3):
             try:
-                resp = self.session.post(url, headers=headers, data=payload, timeout=20)
+                resp = self.session.post(url, headers=headers, data=payload, timeout=60)
                 if 'text/html' in resp.headers.get('Content-Type', ''):
                     raise ValueError(f"Sessão Rejeitada (Retornou HTML). Status: {resp.status_code}")
                 
@@ -306,7 +306,7 @@ class WebPlanClient:
         
         for attempt in range(3):
             try:
-                resp = self.session.post(url, headers=headers, data=payload, timeout=20)
+                resp = self.session.post(url, headers=headers, data=payload, timeout=60)
                 if 'text/html' in resp.headers.get('Content-Type', ''):
                     raise ValueError(f"Sessão Rejeitada (Retornou HTML). Status: {resp.status_code}. URL: {resp.url}")
                 
