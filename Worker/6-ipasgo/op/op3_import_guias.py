@@ -258,7 +258,10 @@ def _save_rows_local(rows, logger, job_user_id=None):
                 guia_record.id_convenio = 6 # IPASGO
                 if row_data.get("codigo_beneficiario"):
                     guia_record.codigo_beneficiario = row_data["codigo_beneficiario"]
-                    cart = db_session.query(Carteirinha).filter(Carteirinha.codigo_beneficiario == row_data["codigo_beneficiario"]).first()
+                    cart = db_session.query(Carteirinha).filter(
+                        Carteirinha.codigo_beneficiario == row_data["codigo_beneficiario"],
+                        Carteirinha.user_id == job_user_id
+                    ).first()
                     if cart:
                         guia_record.carteirinha_id = cart.id
 

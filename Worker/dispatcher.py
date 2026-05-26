@@ -501,7 +501,10 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                                 # Resolve dynamic Carteirinha ID for standalone jobs spanning full portal
                                 current_cid = carteirinha_id
                                 if not current_cid and codigo_benef:
-                                    cart = db.query(Carteirinha).filter(Carteirinha.codigo_beneficiario == codigo_benef).first()
+                                    cart = db.query(Carteirinha).filter(
+                                        Carteirinha.codigo_beneficiario == codigo_benef,
+                                        Carteirinha.user_id == user_id
+                                    ).first()
                                     if cart:
                                         current_cid = cart.id
 
