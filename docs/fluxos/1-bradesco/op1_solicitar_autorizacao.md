@@ -66,7 +66,10 @@ O Bradesco opera com dois registros ANS possíveis: `005711` e `421715`.
 }]
 ```
 
-Dados persistidos automaticamente pelo Dispatcher em `base_guias`.
+Dados persistidos automaticamente pelo Dispatcher em `base_guias` sob o contexto isolado do `user_id` do job:
+- **Identificação do Inquilino:** O `user_id` do job solicitante é propagado e gravado no registro `BaseGuia`.
+- **Adoção e Proteção:** Se a guia for nova, insere vinculando-a ao `user_id`. Se a guia já existir sem proprietário (`user_id` nulo), o sistema a adota associando `user_id = job_user_id`. Se pertencer a outro usuário (`user_id != job_user_id`), a gravação/atualização é ignorada para evitar cross-tenant data leaks.
+- **Carteirinhas:** A carteirinha só é associada à guia se pertencer ao mesmo `user_id` do prestador logado.
 
 ## Erros Tratados
 | Cenário | Comportamento |

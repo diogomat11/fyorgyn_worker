@@ -31,11 +31,14 @@ Para evitar duplicação ou falta de informações críticas, a OP11 converte os
   - Cada grupo único gera **uma linha** de saída para o banco. O código AMB é higienizado (`_normalizar_codigo`) removendo pontos e traços.
   - Soma as quantidades baseadas na quantidade total de itens (sessões solicitadas) e quantos deles têm status `"Autorizado"` (sessões autorizadas).
 
-### 2.4 Persistência e Retorno
+### 2.4 Persistência e Retorno (Isolamento Multitenant)
 - Todos os registros normalizados entram em uma matriz `todas_guias_extraidas`.
-- A função interna `_save_rows_local` faz a persistência usando `SessionLocal()` do SQLAlchemy.
-  - Verifica duplicidade em 2 fases: 
-    1. Fase 1 com match exato de Guia + Cód Terapia.
-    2. Fase 2 com fallback para guias antigas onde o Cód Terapia é vazio.
-  - Cria novas linhas (se não existir) ou atualiza dados importantes (senha, `guia_prestador`, validade) se a guia já estiver persistida.
-- Ao final, retorna ao dispatcher `todas_guias_extraidas`, o qual efetuará a gravação na central (Supabase) via API própria do dispatcher.
+- A função interna `_save_rows_local` faz a persistência usando `SessionLocal()` do SQLAlchemy, aplicando regras estritas de isolamento por `user_id` (prestador logado):
+  - **Identificação do Proprietário:** O parâmetro `job_user_id` é repassado no salvamento de cada registro da tabela `BaseGuia`.
+  - **Verificação Global de Conflito de Chave Única:** A busca por registros existentes é feita de forma global (sem restringir a query por `user_id` no filtro do banco de dados). Isso garante que o sistema identifique se a guia já pertence a outro usuário antes de tentar gravá-la.
+  - **Adoção e Proteção (Regras de Propriedade):**
+    - Se a guia **não existir**: é criada uma nova associada ao `user_id` do job atual.
+    - Se a guia **existir e estiver órfã** (`user_id` nulo): o sistema a adota, associando `user_id = job_user_id`.
+    - Se a guia **existir e pertencer a outro usuário** (`user_id != job_user_id`): a gravação e modificação são puladas (ignoradas) e um alerta é registrado no log. Isso impede vazamento ou modificações cruzadas de guias de terceiros (cross-tenant leak).
+  - **Vínculo de Carteirinhas:** O relacionamento com a tabela `Carteirinha` é restrito pelo `user_id`. Uma carteirinha só é vinculada à guia se ambas pertencerem ao mesmo `user_id` do prestador ativo.
+- Ao final, retorna ao dispatcher `todas_guias_extraidas`, o qual efetuará a gravação na API central (Supabase) sob o contexto exclusivo de segurança do `user_id` do job correspondente.

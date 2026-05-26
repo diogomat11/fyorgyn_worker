@@ -52,7 +52,14 @@ Para evitar concorrência e erro de limites do portal, uma rígida **Hierarquia 
    - Como *Qtde Solicitada* e *Qtde Autorizada* não aparecem no card principal, o bot rastreia o ícone de detalhes: `.../div[2]/div[2]/div/div[1]/div/div[1]/div[2]/div/i[1]`.
    - Clica no botão e aciona o popup `detalhes-itens-guia-modal`.
    - Lê a mini-tabela (`tr[1]/td[2]` e `td[4]`) e aperta em Fechar.
-5. **Commit por Página:**
-   - Para extrema resiliência, caso o FacPlan caia na página 5 de 20, as 4 primeiras inserções no banco foram garantidas. Ao terminar todas as `rows` da página 1, ela é avaliada: apenas linhas concluídas e em estado _AUTORIZADO / EM ESTUDO_ são gravadas no banco do _Worker Local_. 
+5. **Commit por Página (Isolamento Multitenant):**
+   - Para extrema resiliência, caso o FacPlan caia na página 5 de 20, as 4 primeiras inserções no banco foram garantidas. Ao terminar todas as `rows` da página 1, ela é avaliada: apenas linhas concluídas e em estado _AUTORIZADO / EM ESTUDO_ são persistidas no banco de dados local.
+   - O salvamento é efetuado aplicando regras estritas de isolamento por `user_id` (prestador logado):
+     - **Verificação Global de Chave Única:** O sistema busca guias existentes de forma global (sem restringir a query por `user_id` no filtro do banco de dados) para precaver colisões com chaves únicas.
+     - **Adoção e Proteção (Regras de Propriedade):**
+       - Se a guia não existir, é inserida vinculando o `user_id` do job.
+       - Se a guia existir e estiver órfã (`user_id` nulo), o sistema reivindica a propriedade preenchendo o `user_id` do scraper.
+       - Se a guia existir e pertencer a outro prestador (`user_id != job_user_id`), o processamento é ignorado e um aviso é gerado nos logs locais, prevenindo mutações indesejadas em dados de terceiros.
+     - **Isolamento de Carteirinhas:** A carteirinha só é associada à guia se ambas possuírem o mesmo `user_id` do prestador ativo.
    - Apenas neste instante o Job aciona a lógica nativa de avanço (`click_next_page`).
 6. Ao falhar em encontrar um botão próximo válido ou não transacionar o index da primeira guia rastreada, o Loop assume fim das páginas, consolida a lista principal e retorna ao Dispatcher.

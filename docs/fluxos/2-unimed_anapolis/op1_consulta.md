@@ -40,5 +40,13 @@
    - Extrai na visualização de detalhes as faturas, senha, cod de validade, qtd solicitada, etc, e clica em **Voltar**.
    - Interage com botão de texto `"Próxima"` na Footer da página se houver mais de uma aba de registros.
    
-## 5. Acabamento
-- Consolida o log interno. Associa esse array imenso ao modelo de dados do Hub. Fecha a janela do Popup biométrico remanescente e aloca o fluxo no index do WebBrowser, pronto pro Dispatcher concluir como Trabalho `success`.
+## 5. Acabamento e Persistência Multitenant
+- Consolida o log interno. Associa esse array de guias extraídas ao modelo de dados do Hub. Fecha a janela do Popup biométrico remanescente e aloca o fluxo no index do WebBrowser, pronto pro Dispatcher concluir como Trabalho `success`.
+- **Regras de Persistência Multitenant no Dispatcher:**
+  - O salvamento na central (e no banco do worker) associa todas as guias e logs resultantes ao `user_id` correspondente ao criador do job.
+  - **Verificação Global de Guias Existentes:** Busca registros por número de guia e convênio globalmente para evitar duplicidades em chaves únicas.
+  - **Adoção e Proteção (Regras de Propriedade):**
+    - Se a guia não existir, ela é inserida vinculando o `user_id` do job.
+    - Se a guia existir e estiver sem proprietário (`user_id` nulo), o sistema a adota, associando `user_id = job_user_id`.
+    - Se a guia existir e pertencer a outro usuário (`user_id != job_user_id`), o processamento é ignorado e um aviso é gerado nos logs locais, prevenindo mutações indesejadas em dados de terceiros (cross-tenant leak).
+  - **Isolamento de Carteirinhas:** O relacionamento com a tabela `Carteirinha` é isolado de forma que a associação da carteirinha com a guia só ocorra se ambas pertencerem ao mesmo `user_id` do prestador logado.

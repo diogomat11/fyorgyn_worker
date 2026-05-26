@@ -26,4 +26,13 @@
    - A extração aprofundada ocorre adentrando no hiperlink (`td[4]/a`), baixando dados detalhados (data, senha autorizada, código da Carga). 
    - Desvia das armadilhas da Tabela que fecham a Popup precocemente com um fall-back em JS `history.go(-1)`.
 
-4. Usa uma lógica persistente de avanço para a página sub-sequente ao caçar a ancora HTML `Próxima`, submetendo a mesa HTML a um novo Fetch via AJAX. No fim do fluxo o Bot destrói o manipulador e volta á página Web root.
+4. **Paginação e Persistência Multitenant:**
+    - Usa uma lógica persistentemente estruturada de avanço para a página sub-sequente ao caçar a âncora HTML `Próxima`, submetendo a mesa HTML a um novo Fetch via AJAX. No fim do fluxo o Bot destrói o manipulador e retorna à página Web root.
+    - **Regras de Persistência Multitenant no Dispatcher:**
+      - O salvamento na central (e no banco do worker) associa todas as guias e logs resultantes ao `user_id` correspondente ao criador do job.
+      - **Verificação Global de Guias Existentes:** Busca registros por número de guia e convênio globalmente para evitar duplicidades em chaves únicas.
+      - **Adoção e Proteção (Regras de Propriedade):**
+        - Se a guia não existir, ela é inserida vinculando o `user_id` do job.
+        - Se a guia existir e estiver sem proprietário (`user_id` nulo), o sistema a adota, associando `user_id = job_user_id`.
+        - Se a guia existir e pertencer a outro usuário (`user_id != job_user_id`), o processamento é ignorado e um aviso é gerado nos logs locais, prevenindo mutações indesejadas em dados de terceiros (cross-tenant leak).
+      - **Isolamento de Carteirinhas:** O relacionamento com a tabela `Carteirinha` é isolado de forma que a associação da carteirinha com a guia só ocorra se ambas pertencerem ao mesmo `user_id` do prestador logado.
