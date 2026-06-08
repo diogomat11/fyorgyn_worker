@@ -79,3 +79,7 @@ Dados persistidos automaticamente pelo Dispatcher em `base_guias` sob o contexto
 | TipoAtendimento desconhecido | `ValueError` — não retenta |
 | Janela resultado não abriu | Erro — retenta |
 | Upload falhou | Exceção — retenta |
+
+## Nota sobre Sessões Simultâneas
+O portal Orizon (Bradesco) não permite sessões simultâneas concorrentes com o mesmo login. Caso ocorra uma tentativa de login duplo concomitante, a sessão anterior pode ser derrubada ou o acesso ser bloqueado. 
+Para mitigar isso, os jobs OP1 devem preferencialmente rodar com a flag de afinidade estrita (`strict_session_affinity: true`) ativa (padrão para OP1). Isso força o despachante a enfileirar os jobs da mesma credencial no mesmo servidor worker sequencialmente, reaproveitando a sessão ativa no navegador sem realizar novos logins desnecessários.

@@ -145,12 +145,16 @@ def execute(scraper, job_data):
     for step in range(12): # Aguarda até 12s
         logger.info(f"Item 4 - Verificando abas... (Tentativa {step+1}/12)")
         for h in driver.window_handles:
-            driver.switch_to.window(h)
-            title = driver.title.lower() if getattr(driver, "title", None) else ""
-            if "facplan" in title or "bem-vindo" in title:
-                facplan_handle = h
-                logger.info(f"Item 4 - Aba alvo encontrada com sucesso: {driver.title}")
-                break
+            try:
+                driver.switch_to.window(h)
+                url = driver.current_url.lower() if getattr(driver, "current_url", None) else ""
+                title = driver.title.lower() if getattr(driver, "title", None) else ""
+                if "facplan" in url or "facplan" in title or "bem-vindo" in title or "webplan" in url:
+                    facplan_handle = h
+                    logger.info(f"Item 4 - Aba alvo encontrada com sucesso: {title} (URL: {url})")
+                    break
+            except Exception as e:
+                logger.debug(f"Erro ao verificar aba {h}: {e}")
         if facplan_handle: break
         time.sleep(1)
     
@@ -161,13 +165,19 @@ def execute(scraper, job_data):
     if len(driver.window_handles) > 2:
         logger.info("Múltiplas abas detectadas. Limpando histórico residual...")
         main_h = driver.window_handles[0]
-        for h in driver.window_handles[1:]:
-             driver.switch_to.window(h)
-             if facplan_handle and h != facplan_handle:
-                  driver.close()
+        for h in list(driver.window_handles)[1:]:
+             try:
+                 if facplan_handle and h != facplan_handle:
+                      driver.switch_to.window(h)
+                      driver.close()
+             except Exception as e:
+                 logger.debug(f"Erro ao fechar aba residual: {e}")
         # Retorna foco para Facplan se localizado, senao a ultima aberta
-        if facplan_handle: driver.switch_to.window(facplan_handle)
-        else: driver.switch_to.window(driver.window_handles[-1])
+        try:
+            if facplan_handle: driver.switch_to.window(facplan_handle)
+            else: driver.switch_to.window(driver.window_handles[-1])
+        except Exception as e:
+            logger.warning(f"Erro ao restaurar foco para a aba do Facplan: {e}")
 
     # --- ITEM 5: ABRE LINK LOCALIZAR PROCEDIMENTOS ---
     url_procedimentos = "https://novowebplanipasgo.facilinformatica.com.br/GuiasTISS/LocalizarProcedimentos"
@@ -342,51 +352,65 @@ def execute(scraper, job_data):
     execucoes_efetuadas = 0
     
     try:
-        # A API solicita focar nos '.col-xs-...' das sessoes da tabela do modal (.card-body).
-        card_linhas_xpath = '//*[@id="indentificar-confirmar-procedimentos-modal"]//div[contains(@class, "card-body")]/div[contains(@class, "col-xs-")]'
+        # O modal principal de confirmação de procedimentos do IPASGO é "confirmar-procedimentos-modal"
+        main_modal_xpath = '//*[@id="confirmar-procedimentos-modal"]'
+        card_linhas_xpath = f'{main_modal_xpath}//div[contains(@class, "card-body")]//div[contains(@class, "row")]'
+        
+        logger.info("Aguardando carregamento e renderização das sessões no modal de procedimentos...")
+        # Aguarda de forma segura a renderização do primeiro item no modal (Knockout rendering)
+        wait_xpath(driver, card_linhas_xpath + '[1]', 8)
+        
         linhas_sessoes = driver.find_elements(By.XPATH, card_linhas_xpath)
         
         if not linhas_sessoes:
-            card_orig = wait_xpath(driver, '//*[@id="indentificar-confirmar-procedimentos-modal"]//div[contains(@class, "card-body")]', 5)
-            if card_orig:
-                linhas_sessoes = card_orig.find_elements(By.XPATH, './div')
-            else:
-                linhas_sessoes = []
+            # Captura o HTML para depuração
+            try:
+                debug_path = r"C:\Users\diogo\.gemini\antigravity\scratch\modal_debug.html"
+                os.makedirs(os.path.dirname(debug_path), exist_ok=True)
+                with open(debug_path, "w", encoding="utf-8") as f:
+                    f.write(driver.page_source)
+                logger.info(f"Salvo page_source para depuração em: {debug_path}")
+            except Exception as debug_err:
+                logger.warning(f"Erro ao salvar page_source: {debug_err}")
 
         max_disponivel = len(linhas_sessoes)
         logger.info(f"Identificadas {max_disponivel} sessões passíveis na guia.")
         
-        sessoes_processar = min(sessoes_realizadas, max_disponivel)
-        
-        if sessoes_processar <= 0:
+        if sessoes_realizadas <= 0:
             logger.info("Nenhuma sessão solicitada para confirmar.")
         else:
-            for i in range(1, sessoes_processar + 1):
+            for i in range(1, max_disponivel + 1):
+                if execucoes_efetuadas >= sessoes_realizadas:
+                    logger.info(f"Meta de {sessoes_realizadas} sessões a confirmar atingida.")
+                    break
                 try:
-                    linha_box_xpath = f'//*[@id="indentificar-confirmar-procedimentos-modal"]//div[contains(@class, "card-body")]/div[contains(@class, "col-xs-")][{i}]'
-                    linha_el = wait_xpath(driver, linha_box_xpath, 2)
-                    
+                    linha_box_xpath = f'({card_linhas_xpath})[{i}]'
+                    linha_el = wait_xpath(driver, linha_box_xpath, 3)
                     if not linha_el:
-                        # Fallback index caso o col-xs n bata a arvore
-                        linha_box_xpath = f'//*[@id="indentificar-confirmar-procedimentos-modal"]//div[contains(@class, "card-body")]/div[{i}]'
-                        linha_el = wait_xpath(driver, linha_box_xpath, 2)
-                        if not linha_el:
-                            continue
+                        logger.warning(f"Linha de sessão index {i} não localizada.")
+                        continue
                         
                     texto = linha_el.text
                     if "Não confirmado" not in texto:
                         logger.info(f"Sessão index {i} ignorada (aparentemente item_ja_executado pelas validações visuais).")
                         continue
                         
-                    btn_confirma_xpath = f'{linha_box_xpath}//button[@data-bind="visible: HabilitadoConfirmacao"]'
+                    # O link para abrir a confirmação individual é um span com o texto 'confirmar'
+                    btn_confirma_xpath = f'{linha_box_xpath}//span[contains(@data-bind, "identificarConfirmacaoProcedimento") or text()="confirmar"]'
                     btn_confirmar = wait_xpath(driver, btn_confirma_xpath, 3)
                     
-                    if btn_confirmar and btn_confirmar.is_displayed():
+                    if btn_confirmar:
+                        logger.info(f"Clicando para abrir confirmação da sessão index {i}...")
                         driver.execute_script("arguments[0].scrollIntoView({block:'center'});", btn_confirmar)
                         time.sleep(0.5)
-                        btn_confirmar.click()
-                        time.sleep(1)
+                        try:
+                            btn_confirmar.click()
+                        except:
+                            driver.execute_script("arguments[0].click();", btn_confirmar)
+                        time.sleep(2)
                         
+                        # O modal secundário para digitar o cartão é "indentificar-confirmar-procedimentos-modal"
+                        sec_modal_xpath = '//*[contains(@id, "dentificar-confirmar-procedimentos-modal") or @id="indentificar-confirmar-procedimentos-modal" or @id="identificar-confirmar-procedimentos-modal"]'
                         input_carteira_modal = wait_xpath(driver, '//*[@id="numeroDaCarteiraConfirmacao"]', 5)
                         if input_carteira_modal:
                             if input_carteira_modal.get_attribute("disabled"):
@@ -396,6 +420,21 @@ def execute(scraper, job_data):
                             input_carteira_modal.send_keys(carteira)
                             time.sleep(0.5)
                             input_carteira_modal.send_keys(Keys.TAB)
+                            time.sleep(1)
+                            
+                            # Clicar no botão 'Confirmar' do modal secundário
+                            btn_confirma_segundo_xpath = f'{sec_modal_xpath}//button[text()="Confirmar" or contains(@data-bind, "ConfirmaRealizacao")]'
+                            btn_confirma_segundo = wait_xpath(driver, btn_confirma_segundo_xpath, 3)
+                            if btn_confirma_segundo:
+                                logger.info("Clicando no botão de confirmação do modal secundário...")
+                                try:
+                                    btn_confirma_segundo.click()
+                                except:
+                                    driver.execute_script("arguments[0].click();", btn_confirma_segundo)
+                            else:
+                                logger.warning("Botão de Confirmar do modal secundário não localizado. Enviando Enter no input...")
+                                input_carteira_modal.send_keys(Keys.ENTER)
+                            
                             time.sleep(2)
                             
                         # Notificacao do sistema Noty (Angular Toaster) confirmando ou criticando a validez
@@ -428,15 +467,15 @@ def execute(scraper, job_data):
         logger.error(f"Rompimento fatal no loop de execução: {e}")
         raise
     finally:
-        # 6. FECHAMENTO DO MODAL DO IPASGO
+        # 6. FECHAMENTO DO MODAL PRINCIPAL DO IPASGO
         try:
-            fechar_btn_xpath = '//*[@id="indentificar-confirmar-procedimentos-modal"]//button[contains(text(), "Fechar") or @data-dismiss="modal"]'
+            fechar_btn_xpath = '//*[@id="confirmar-procedimentos-modal"]//button[contains(text(), "Fechar") or @data-dismiss="modal"]'
             fechar_btn = wait_xpath(driver, fechar_btn_xpath, 3)
             if fechar_btn:
                 driver.execute_script("arguments[0].click();", fechar_btn)
                 time.sleep(1)
             else:
-                fallback_fechar = '//*[@id="indentificar-confirmar-procedimentos-modal"]/div/div/div[3]/div/button[1]'
+                fallback_fechar = '//*[@id="confirmar-procedimentos-modal"]/div/div/div[3]/div/button[1]'
                 fbc = wait_xpath(driver, fallback_fechar, 1)
                 if fbc:
                      driver.execute_script("arguments[0].click();", fbc)

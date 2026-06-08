@@ -263,11 +263,11 @@ class UnimedAnopolisScraper(BaseScraper):
                     from op.op1_consulta import execute as op1_execute
                     results = op1_execute(self, job_data)
                     
-                elif str(rotina).lower() in ("2", "captura"):
+                elif str(rotina).lower() in ("2", "captura", "op2_captura"):
                     from op.op2_captura import execute as op2_execute
                     results = op2_execute(self, job_data)
                     
-                elif str(rotina).lower() in ("execução", "execucao", "3"):
+                elif str(rotina).lower() in ("execução", "execucao", "3", "op3_execucao"):
                     from op.op3_execucao import execute as op3_execute
                     results = op3_execute(self, job_data)
 

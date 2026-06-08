@@ -151,11 +151,11 @@ class UnimedScraper(BaseScraper):
 
                     results = op1_execute(self, job_data)
                     
-                elif str(rotina).lower() == "captura":
+                elif str(rotina).lower() in ("captura", "op2_captura", "2"):
                     from op.op2_captura import execute as op2_execute
                     results = op2_execute(self, job_data)
                     
-                elif str(rotina).lower() in ("execução", "execucao", "3"):
+                elif str(rotina).lower() in ("execução", "execucao", "3", "op3_execucao"):
                     from op.op3_execucao import execute as op3_execute
                     results = op3_execute(self, job_data)
                     
@@ -191,6 +191,9 @@ class UnimedScraper(BaseScraper):
             self.db.commit()
         except:
             self.db.rollback()
+            
+        if execution.status == "error":
+            raise Exception(f"Job failed internally: {error_msg}")
             
         return results
 

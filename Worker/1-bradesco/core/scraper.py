@@ -52,13 +52,13 @@ class BradescoScraper(BaseScraper):
                     self.log(
                         f"Registro user_convenios incompleto para user_id={self.user_id} e convenio={self.id_convenio}. "
                         f"Login={getattr(user_conv, 'login', 'N/A') if user_conv else 'NOT FOUND'}",
-                        level="ERROR"
+                        level="INFO"
                     )
             else:
-                self.log("user_id nao fornecido ao scraper — nao foi possivel carregar credenciais", level="ERROR")
+                self.log("user_id nao fornecido ao scraper — nao foi possivel carregar credenciais", level="INFO")
             self.log(
                 f"Credenciais nao encontradas em user_convenios para user_id={self.user_id} e convenio={self.id_convenio}",
-                level="ERROR"
+                level="INFO"
             )
         except Exception as e:
             self.log(f"Bradesco Credential Load Error: {e}", level="ERROR")
@@ -212,6 +212,21 @@ class BradescoScraper(BaseScraper):
                         url = self.driver.current_url if self.driver else "data:,"
                         if url.startswith("data:") or "login" in url.lower():
                             need_login = True
+                        elif self.driver:
+                            # Strict check: did the driver previously log in with a different user?
+                            driver_login = getattr(self.driver, "last_login", None)
+                            if self.username and driver_login and driver_login != self.username:
+                                self.log(
+                                    f"Driver session belongs to login={driver_login}, but job needs login={self.username}. "
+                                    f"Clearing cookies and forcing re-login.", 
+                                    job_id=job_id
+                                )
+                                try:
+                                    self.driver.delete_all_cookies()
+                                    self.driver.get("about:blank") # Reset to clean page
+                                except Exception as cookie_err:
+                                    self.log(f"Failed to clear cookies: {cookie_err}", level="WARN", job_id=job_id)
+                                need_login = True
                     except Exception:
                         need_login = True
 
@@ -224,6 +239,10 @@ class BradescoScraper(BaseScraper):
                             self.log(f"Using isolated driver mode: {pool_err}", level="WARN", job_id=job_id)
 
                     self.login(job_data)
+
+                # Update the active login session on the driver object
+                if self.driver:
+                    self.driver.last_login = self.username
 
                 # Execute mapped OP
                 results = self.execute_op(op_name, job_data)

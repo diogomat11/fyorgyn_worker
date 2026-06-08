@@ -2,7 +2,7 @@
 cd /d "%~dp0"
 
 echo ==========================================
-echo      BASE GUIAS MANAGER - BUILDER
+echo      FYORGYN MANAGER - BUILDER
 echo ==========================================
 
 echo.
@@ -29,7 +29,7 @@ echo [4/4] Compiling Executable...
 echo     This process may take several minutes. Please wait.
 
 python -m PyInstaller --clean --noconsole --onefile ^
-    --name "BaseGuiasManager" ^
+    --name "FyorGynManager" ^
     --hidden-import=Worker ^
     --hidden-import=uvicorn ^
     --hidden-import=fastapi ^
@@ -44,12 +44,12 @@ python -m PyInstaller --clean --noconsole --onefile ^
     gui.py
 
 echo.
-if exist "dist\BaseGuiasManager.exe" (
+if exist "dist\FyorGynManager.exe" (
     echo ==========================================
     echo           BUILD SUCCESSFUL!
     echo ==========================================
     echo The executable is ready at:
-    echo %~dp0dist\BaseGuiasManager.exe
+    echo %~dp0dist\FyorGynManager.exe
     echo.
 ) else (
     echo ==========================================

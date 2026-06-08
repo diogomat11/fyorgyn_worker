@@ -139,6 +139,32 @@ def get_ranked_pending_jobs(db, limit=20):
                   .order_by(Job.priority.asc(), Job.created_at.asc()).limit(limit).all()
 
 
+def get_job_login(db, job):
+    if not job:
+        return None
+    import json as _json
+    login = None
+    if job.params:
+        try:
+            params_dict = job.params if isinstance(job.params, dict) else _json.loads(job.params)
+            if isinstance(params_dict, dict):
+                login = params_dict.get("login") or params_dict.get("users_convenio_login")
+        except Exception:
+            pass
+    if not login and job.id_convenio == 1 and job.user_id:
+        try:
+            from models import UserConvenio
+            uconv = db.query(UserConvenio).filter(
+                UserConvenio.user_id == job.user_id,
+                UserConvenio.id_convenio == 1
+            ).first()
+            if uconv:
+                login = uconv.login
+        except Exception:
+            pass
+    return login
+
+
 # Keep for backward compatibility
 def get_pending_job(db, allowed_convenio_ids=None):
     jobs = get_ranked_pending_jobs(db, limit=50)
@@ -353,7 +379,16 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
     for url, convs in server_convenio_map.items():
         logger.info(f"  {url} -> convenios: {convs if convs else 'ALL'}")
 
-    server_status_map = {url: {"status": "idle", "last_job": None, "convenio_ids": server_convenio_map[url]} for url in servers}
+    server_status_map = {
+        url: {
+            "status": "idle", 
+            "last_job": None, 
+            "convenio_ids": server_convenio_map[url],
+            "last_convenio_id": None,
+            "last_user_id": None,
+            "last_login": None
+        } for url in servers
+    }
     dispatch_stagger_val = stagger
 
     # Start Heartbeat Thread
@@ -384,6 +419,11 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                         params_dict["cod_prestador"] = uconv.cod_prestador
                     
             params_str = _json.dumps(params_dict)
+
+            # Skip base_guias sync/save for Bradesco OP1 Fature
+            is_bradesco_fature = False
+            if id_convenio == 1 and params_dict.get("contexto") == "fature":
+                is_bradesco_fature = True
 
             payload = {
                 "job_id": job_id,
@@ -458,6 +498,9 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                         # No results and no self_persisted flag — just log empty sync
                         db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="INFO", message="Sync complete. Inserted: 0, Updated: 0 (Worker retornou vazio)"))
                         db.commit()
+                    elif is_bradesco_fature:
+                        db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="INFO", message="Sync completo. Resultados retornados no payload (gravação em base_guias ignorada para faturamento Bradesco)."))
+                        db.commit()
                     else:
                         count_inserted = 0
                         count_updated = 0
@@ -497,6 +540,17 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                                 guia_prestador_val = item.get("guia_prestador")
                                 
                                 status_guia_val = str(item.get("status_guia", item.get("status", "Autorizado"))).strip()
+                                
+                                # Map Orizon/Bradesco numeric status or prefer description
+                                if id_convenio == 1:
+                                    if item.get("descricao"):
+                                        status_guia_val = str(item.get("descricao")).strip()
+                                    elif status_guia_val == "5" or status_guia_val.upper() == "EXPORTADA":
+                                        status_guia_val = "Exportada"
+                                    elif status_guia_val == "4" or status_guia_val.upper() == "LIBERADA":
+                                        status_guia_val = "Liberada"
+                                    elif status_guia_val == "199" or status_guia_val.upper() == "PENDENTE":
+                                        status_guia_val = "Pendente"
                                 
                                 # Resolve dynamic Carteirinha ID for standalone jobs spanning full portal
                                 current_cid = carteirinha_id
@@ -575,7 +629,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                                     existing_guia.updated_at = datetime.now(timezone.utc)
                                     count_updated += 1
                                 else:
-                                    if status_guia_val.upper() not in ["AUTORIZADO", "EM ESTUDO", "SOLICITADO", "EM AVALIAÇÃO", "EM APROVAÇÃO E AGUARDANDO P", "NEGADO", "CANCELADO"]:
+                                    if status_guia_val.upper() not in ["AUTORIZADO", "EM ESTUDO", "SOLICITADO", "EM AVALIAÇÃO", "EM APROVAÇÃO E AGUARDANDO P", "NEGADO", "CANCELADO", "EXPORTADA", "EXPORTADO", "PENDENTE", "FATURADA", "LIBERADA"]:
                                         continue
                                     
                                     new_guia = BaseGuia(
@@ -715,24 +769,68 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 
                 def pick_server(job, idle_servers):
                     """Pick the best idle server for this job using priority rules."""
+                    job_login = get_job_login(db, job)
                     
-                    # Strict User-Affinity for Bradesco to avoid double-session
+                    # Determine if strict session affinity should be enforced
+                    enforce_affinity = False
                     if job.id_convenio == 1 and job.user_id:
+                        import json as _json
+                        try:
+                            params_dict = job.params if isinstance(job.params, dict) else _json.loads(job.params)
+                            if isinstance(params_dict, dict):
+                                # Check if parameter is explicitly defined
+                                if "strict_session_affinity" in params_dict:
+                                    enforce_affinity = bool(params_dict["strict_session_affinity"])
+                                elif "strict_session" in params_dict:
+                                    enforce_affinity = bool(params_dict["strict_session"])
+                                elif "strict_affinity" in params_dict:
+                                    enforce_affinity = bool(params_dict["strict_affinity"])
+                                else:
+                                    # Default to True for Bradesco OP1 (rotina == "1" or "op1...")
+                                    rotina_str = str(job.rotina).lower()
+                                    if rotina_str == "1" or rotina_str.startswith("op1"):
+                                        enforce_affinity = True
+                        except Exception:
+                            pass
+                            
+                    # Strict Affinity: force job to run on the server that currently has the user's login session
+                    if enforce_affinity:
                         for s_url, s_meta in server_status_map.items():
-                            if s_meta.get("last_convenio_id") == 1 and s_meta.get("last_user_id") == job.user_id:
+                            match_user = s_meta.get("last_user_id") == job.user_id
+                            match_login = (job_login and s_meta.get("last_login") == job_login)
+                            if s_meta.get("last_convenio_id") == 1 and (match_user or match_login):
                                 if s_url in idle_servers:
                                     return s_url
                                 else:
-                                    # User is already processing a job on another server. Must wait!
+                                    # Server is busy, must wait to avoid simultaneous logins!
                                     return None
-                                    
+
+                    # If not enforcing strict affinity, or no active session exists yet for this user/login,
+                    # search for the best available idle server.
+                    # 1. Prefer idle server with matching login session (if convenio matches)
+                    if job.id_convenio == 1 and job_login:
+                        for s in idle_servers:
+                            s_meta = server_status_map[s]
+                            if s_meta.get("last_convenio_id") == 1 and s_meta.get("last_login") == job_login:
+                                return s
+
+                    # 2. Prefer idle server with NO active session for this convenio (clean slate)
+                    for s in idle_servers:
+                        s_meta = server_status_map[s]
+                        if s_meta.get("last_convenio_id") != job.id_convenio or not s_meta.get("last_login"):
+                            bindings = server_convenio_map.get(s)
+                            if bindings is None or job.id_convenio in bindings:
+                                return s
+
                     last_conv_match = []
                     for s in idle_servers:
                         # For Bradesco, prefer an idle server that has NO user session, or matches user
                         if server_status_map[s].get("last_convenio_id") == job.id_convenio:
-                            if job.id_convenio == 1 and job.user_id:
-                                if server_status_map[s].get("last_user_id") != job.user_id:
-                                    continue # Don't hijack another user's Bradesco session if possible
+                            if job.id_convenio == 1:
+                                # For Bradesco, we can reuse any server (scraper will clear cookies if login changes)
+                                pass
+                            elif job.user_id and server_status_map[s].get("last_user_id") != job.user_id:
+                                continue # Don't hijack another user's session for other convenios
                             bindings = server_convenio_map.get(s)
                             if bindings is None or job.id_convenio in bindings:
                                 last_conv_match.append(s)
@@ -820,6 +918,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                     server_status_map[server_url]["status"] = "busy"
                     server_status_map[server_url]["last_convenio_id"] = locked_job.id_convenio
                     server_status_map[server_url]["last_user_id"] = locked_job.user_id
+                    server_status_map[server_url]["last_login"] = get_job_login(db, locked_job)
                     dispatched_servers.add(server_url)
                     
                     # Spawn thread to call worker server

@@ -118,6 +118,7 @@ def run(scraper, job_data):
     
     sucesso_count = 0
     erro_count = 0
+    failed_items = []
     from models import FaturamentoLote
     from datetime import datetime
 
@@ -171,6 +172,13 @@ def run(scraper, job_data):
             scraper.db.rollback()
             scraper.log(f"Falha no item {detalhe_id}: {e}", level="ERROR", job_id=job_id)
             erro_count += 1
+            failed_items.append({
+                "detalheId": detalhe_id,
+                "status": status,
+                "dataRealizacao": data_realizacao,
+                "valorProcedimento": valor_procedimento,
+                "erro": str(e)
+            })
             
     # Ao final atualiza contagem final
     if job_id:
@@ -185,8 +193,27 @@ def run(scraper, job_data):
         
     scraper.log(f"OP7 Finalizada: {sucesso_count} sucessos, {erro_count} erros.", job_id=job_id)
     
-    if erro_count > 0 and erro_count == len(itens_batch):
-        raise RuntimeError("Todos os itens falharam no fechamento de faturamento.")
+    if erro_count > 0:
+        # Encontrou erros. Atualizar params do Job com apenas os itens que falharam.
+        from models import Job
+        job = scraper.db.query(Job).filter(Job.id == job_id).first()
+        if job:
+            import json
+            try:
+                # Atualizar params para conter apenas os itens que falharam
+                params_dict = json.loads(job.params) if isinstance(job.params, str) else (job.params or {})
+                params_dict["itens"] = failed_items
+                job.params = params_dict
+                
+                # Impedir retentativa automática do dispatcher definindo tentativas = 3
+                job.attempts = 3
+                scraper.db.commit()
+                scraper.log(f"OP7 - Atualizou o Job #{job_id} no banco com {len(failed_items)} itens restantes com erro e tentativas=3 para evitar loop automático.", job_id=job_id)
+            except Exception as update_err:
+                scraper.db.rollback()
+                scraper.log(f"OP7 - Erro ao atualizar o Job #{job_id} com itens falhos: {update_err}", level="ERROR", job_id=job_id)
+                
+        raise RuntimeError(f"OP7 finalizada com erros: {erro_count} de {len(itens_batch)} itens falharam. Verifique os logs e reenvie.")
         
     return []
 

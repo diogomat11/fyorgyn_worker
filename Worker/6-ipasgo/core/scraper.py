@@ -164,6 +164,14 @@ class IpasgoScraper(BaseScraper):
             "13": "op13_criar_lote",
             "14": "op14_cancelar_lote",
             "13_poll": "op13_poll_lote",
+            "Execução": "op4_confirma_guia",
+            "execucao": "op4_confirma_guia",
+            "execução": "op4_confirma_guia",
+            "Captura": "op3_import_guias",
+            "captura": "op3_import_guias",
+            "Impressão": "op5_impress_guia",
+            "impressao": "op5_impress_guia",
+            "impressão": "op5_impress_guia",
         }
         
         op_name = op_map.get(str(rotina))
@@ -222,5 +230,8 @@ class IpasgoScraper(BaseScraper):
             self.db.commit()
         except: self.db.rollback()
         
+        if execution.status == "error":
+            raise Exception(f"Job failed internally: {error_msg}")
+            
         return results
 

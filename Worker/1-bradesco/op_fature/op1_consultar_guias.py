@@ -118,8 +118,32 @@ def run(scraper: BaseScraper, job_data: dict) -> list:
             scraper.log(f"Guia encontrada na Chamada 2. StatusGuia: {status_guia} ({descricao})", job_id=job_id)
             return [{"guia": guia, "status_guia": status_guia, "descricao": descricao}]
 
+        # Se retornou vazio, tenta a chamada 3: Verificar se tem status 4 (Liberada)
+        url_chamada_3 = (
+            f"https://rest-guia-fature-apicast-production.api.ocppr.orizon.com.br/api/Status_Guia/GetGuiasLote"
+            f"?Prestador_Id={prestador_id}&Operadora_Id=48&Status_Guia_Id=4"
+            f"&carteirinhaOuNomeBeneficiario={guia}&reg_ans={reg_ans}&numeroGuiaPrestador={guia}"
+        )
+        
+        scraper.log(f"Chamada 2 vazia. Tentando Chamada 3 (Liberada / Lote)... URL: {url_chamada_3}", job_id=job_id)
+        
+        res3_text = _fetch_via_js(driver, url_chamada_3)
+        scraper.log(f"Raw Resposta Chamada 3: {res3_text}", job_id=job_id)
+        res3_json = []
+        if res3_text:
+            try:
+                res3_json = json.loads(res3_text)
+            except json.JSONDecodeError:
+                scraper.log("Falha ao fazer parse do JSON na chamada 3", level="WARN", job_id=job_id)
+
+        if isinstance(res3_json, list) and len(res3_json) > 0:
+            status_guia = res3_json[0].get("StatusGuia")
+            descricao = res3_json[0].get("Descricao", "Desconhecido")
+            scraper.log(f"Guia encontrada na Chamada 3. StatusGuia: {status_guia} ({descricao})", job_id=job_id)
+            return [{"guia": guia, "status_guia": status_guia, "descricao": descricao}]
+
         # Se não achou em nenhum lugar
-        scraper.log("Nenhum dado encontrado para a guia nas duas consultas.", job_id=job_id)
+        scraper.log("Nenhum dado encontrado para a guia nas três consultas.", job_id=job_id)
         return [{"guia": guia, "status_guia": "Guia não localizada", "descricao": "Não Encontrado"}]
 
     except Exception as e:

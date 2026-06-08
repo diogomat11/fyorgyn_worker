@@ -106,7 +106,7 @@ def create_tray_icon():
 class SystemManagerApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Base Guias Unimed - Manager")
+        self.root.title("FyorGyn - Plataforma Operacional para Clínicas - Manager")
         self.root.geometry("800x850") # Slightly wider
         
         # Dark Theme Colors
@@ -303,7 +303,7 @@ class SystemManagerApp:
         
         # You could add logo here using tk.PhotoImage
         
-        lbl = ttk.Label(header_frame, text="Base Guias Admin", style="Header.TLabel")
+        lbl = ttk.Label(header_frame, text="FyorGyn Admin", style="Header.TLabel")
         lbl.pack(side="left")
         
         status_dot = tk.Label(header_frame, text="●", fg="#555555", bg=self.colors["bg"], font=("Arial", 24))
@@ -496,7 +496,7 @@ class SystemManagerApp:
     def set_autostart(self, enable):
         import winreg
         key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
-        app_name = "BaseGuiasManager"
+        app_name = "FyorGynManager"
         
         try:
             key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_ALL_ACCESS)
@@ -868,7 +868,7 @@ class SystemManagerApp:
         
         image = create_tray_icon()
         menu = (item('Show', self.show_window), item('Quit', self.quit_app))
-        self.tray_icon = pystray.Icon("BaseGuias", image, "Base Guias Manager", menu)
+        self.tray_icon = pystray.Icon("FyorGyn", image, "FyorGyn Manager", menu)
         
         # Pystray run is blocking, needs thread
         threading.Thread(target=self.tray_icon.run, daemon=True).start()
