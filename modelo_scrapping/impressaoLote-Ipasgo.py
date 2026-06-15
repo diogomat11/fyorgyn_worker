@@ -147,7 +147,7 @@ def open_prestador():
             except:
                 logging.warning("Aviso: Overlay ainda presente ou timeout.")
 
-            mod_xpath = "/html/body/form/div[3]/div/div[2]/div/div[2]/div/div/span/div[5]/div/div[2]/div[2]/div/div/div[2]/table/tbody/tr[2]/td/div/a"
+            mod_xpath = "/html/body/form/div[3]/div/div[2]/div/div[2]/div/div/span/div[6]/div/div[2]/div[2]/div/div/div[2]/table/tbody/tr[2]/td/div/a"
             mod_btn = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, mod_xpath)))
             
             # JS Click
@@ -166,7 +166,7 @@ def open_prestador():
             else:
                 logging.warning("Aviso: Nova aba não abriu após 20s.")
         except Exception as e:
-            log_exception(e, "acessar módulo após login", locator="/html/body/form/div[3]/div/div[2]/div/div[2]/div/div/span/div[5]/div/div[2]/div[2]/div/div/div[2]/table/tbody/tr[2]/td/div/a")
+            log_exception(e, "acessar módulo após login", locator="/html/body/form/div[3]/div/div[2]/div/div[2]/div/div/span/div[6]/div/div[2]/div[2]/div/div/div[2]/table/tbody/tr[2]/td/div/a")
             raise
         sleep(5)
         driver.switch_to.window(driver.window_handles[1])

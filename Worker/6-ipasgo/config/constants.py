@@ -38,7 +38,7 @@ X_ALERT_CLOSE = '//*[contains(@class,"close") or contains(@class,"fechar") or co
 
 # Link que abre módulo principal (FacPlan) em nova aba
 X_FACPLAN_LINK = '//*[contains(@href, "facplan") or contains(., "FacPlan") or contains(., "FACPLAN")]'
-X_FACPLAN_LINK_ABS = '/html/body/form/div[3]/div/div[2]/div/div[2]/div/div/span/div[5]/div/div[2]/div[2]/div/div/div[2]/table/tbody/tr[2]/td/div/a'
+X_FACPLAN_LINK_ABS = '/html/body/form/div[3]/div/div[2]/div/div[2]/div/div/span/div[6]/div/div[2]/div[2]/div/div/div[2]/table/tbody/tr[2]/td/div/a'
 
 
 # ===========================

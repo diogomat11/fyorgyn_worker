@@ -165,7 +165,7 @@ def run(scraper: BaseScraper, job_data: dict) -> list[dict]:
     # Acesso opcional ao FACPLAN caso disponível no Dashboard
     try:
         link = find_with_frames([
-            "/html/body/form/div[3]/div/div[2]/div/div[2]/div/div/span/div[5]/div/div[2]/div[2]/div/div/div[2]/table/tbody/tr[2]/td/div/a",
+            "/html/body/form/div[3]/div/div[2]/div/div[2]/div/div/span/div[6]/div/div[2]/div[2]/div/div/div[2]/table/tbody/tr[2]/td/div/a",
             "//a[contains(.,'Fac') and contains(.,'Plan')]",
             "//a[contains(@href,'Portal_FAC') or contains(@href,'facplan')]",
         ])
