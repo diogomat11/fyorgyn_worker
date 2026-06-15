@@ -103,7 +103,7 @@ def get_ranked_pending_jobs(db, limit=20):
     Jobs at the same effective priority are ordered by created_at ASC (oldest first).
     """
     try:
-        rules = db.query(PriorityRule).filter(PriorityRule.is_active == True).all()
+        rules = db.query(PriorityRule).filter(PriorityRule.is_active == 1).all()
         rules_map = {(r.id_convenio, r.rotina): r for r in rules}
         # Also add fallback (convenio, None) entries
         for r in rules:
