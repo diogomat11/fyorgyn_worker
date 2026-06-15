@@ -59,9 +59,9 @@ class Carteirinha(Base):
     is_temporary = Column(Boolean, default=False)
     expires_at = Column(DateTime(timezone=True), nullable=True)
 
-    jobs = relationship("Job", back_populates="carteirinha_rel", cascade="all, delete-orphan")
+    jobs = relationship("Job", primaryjoin="Carteirinha.id == Job.carteirinha_id", back_populates="carteirinha_rel", cascade="all, delete-orphan")
     guias = relationship("BaseGuia", back_populates="carteirinha_rel", cascade="all, delete-orphan")
-    logs = relationship("Log", back_populates="carteirinha_rel", cascade="all, delete-orphan")
+    logs = relationship("Log", primaryjoin="Carteirinha.id == Log.carteirinha_id", back_populates="carteirinha_rel", cascade="all, delete-orphan")
     convenio_rel = relationship("Convenio")
 
 class Job(Base):
@@ -69,9 +69,9 @@ class Job(Base):
     __table_args__ = {'schema': 'worker', 'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
-    carteirinha_id = Column(Integer, ForeignKey("public.carteirinhas.id", ondelete="CASCADE"), nullable=True)
-    id_convenio = Column(Integer, ForeignKey("public.convenios.id_convenio", ondelete="SET NULL"), nullable=True)
-    user_id = Column(Integer, ForeignKey("public.users.id", ondelete="SET NULL"), nullable=True, index=True)
+    carteirinha_id = Column(Integer, ForeignKey("carteirinhas.id", ondelete="CASCADE"), nullable=True)
+    id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="SET NULL"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     rotina = Column(Text) # consulta_guias, autorizacao, etc.
     params = Column(JSONB, nullable=True) # Arbitrary JSON parameters
     status = Column(Text, nullable=False, default="pending", index=True) # success, pending, processing, error
@@ -83,7 +83,7 @@ class Job(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    carteirinha_rel = relationship("Carteirinha", back_populates="jobs")
+    carteirinha_rel = relationship("Carteirinha", primaryjoin="Job.carteirinha_id == Carteirinha.id", back_populates="jobs")
     convenio_rel = relationship("Convenio")
     logs = relationship("Log", back_populates="job_rel", cascade="all, delete-orphan")
 
@@ -154,14 +154,14 @@ class Log(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     job_id = Column(Integer, ForeignKey("worker.jobs.id", ondelete="SET NULL"), nullable=True)
-    carteirinha_id = Column(Integer, ForeignKey("public.carteirinhas.id", ondelete="SET NULL"), nullable=True)
-    user_id = Column(Integer, ForeignKey("public.users.id", ondelete="SET NULL"), nullable=True, index=True)
+    carteirinha_id = Column(Integer, ForeignKey("carteirinhas.id", ondelete="SET NULL"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     level = Column(Text, default="INFO") # INFO, WARN, ERROR
     message = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     job_rel = relationship("Job", back_populates="logs")
-    carteirinha_rel = relationship("Carteirinha", back_populates="logs")
+    carteirinha_rel = relationship("Carteirinha", primaryjoin="Log.carteirinha_id == Carteirinha.id", back_populates="logs")
 
 
 class Worker(Base):
@@ -228,7 +228,7 @@ class PriorityRule(Base):
     __table_args__ = {'schema': 'worker', 'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
-    id_convenio = Column(Integer, ForeignKey("public.convenios.id_convenio", ondelete="CASCADE"))
+    id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="CASCADE"))
     rotina = Column(Text)
     base_priority = Column(Integer, default=2)  # Starting priority level (0 = highest)
     escalation_minutes = Column(Integer, default=10)  # Minutes per priority step-up towards 0
@@ -251,7 +251,7 @@ class ServerConfig(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     server_url = Column(Text, unique=True, nullable=False)  # e.g. "http://127.0.0.1:9000"
-    id_convenio = Column(Integer, ForeignKey("public.convenios.id_convenio", ondelete="SET NULL"), nullable=True)
+    id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="SET NULL"), nullable=True)
     rotina = Column(Text, nullable=True)  # NULL = any rotina for preferred convenio
     preference_bonus = Column(Integer, default=1)  # points subtracted from effective_priority for matching jobs
     is_active = Column(Boolean, default=True)
@@ -266,7 +266,7 @@ class JobExecution(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     job_id = Column(Integer, ForeignKey("worker.jobs.id", ondelete="CASCADE"))
-    id_convenio = Column(Integer, ForeignKey("public.convenios.id_convenio", ondelete="SET NULL"), nullable=True)
+    id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="SET NULL"), nullable=True)
     rotina = Column(Text)
     status = Column(Text)
     start_time = Column(DateTime(timezone=True), server_default=func.now())
