@@ -34,19 +34,22 @@ class UnimedScraper(BaseScraper):
 
     def _load_credentials(self):
         try:
-            conv = self.db.query(Convenio).filter(Convenio.id_convenio == self.id_convenio).first()
-            if conv and conv.usuario and conv.senha_criptografada:
-                self.username = conv.usuario
-                self.password = decrypt_password(conv.senha_criptografada)
-                print(f">>> [Goiania] Credentials loaded from DB for convenio {self.id_convenio}")
-            else:
-                msg = f"[Goiania] ERRO: Credenciais ausentes no banco para convenio {self.id_convenio}"
-                print(f">>> {msg}")
-                self.log(msg, level="ERROR")
+            if self.user_id:
+                from models import UserConvenio
+                uconv = self.db.query(UserConvenio).filter(
+                    UserConvenio.user_id == self.user_id,
+                    UserConvenio.id_convenio == self.id_convenio
+                ).first()
+                if uconv:
+                    self.username = uconv.login
+                    if uconv.senha_criptografada:
+                        self.password = decrypt_password(uconv.senha_criptografada)
+                    print(f">>> [Goiania] Credentials loaded from UserConvenio for user {self.user_id}")
+                    return
+            print(f">>> [Goiania] Credentials will be loaded from Job params.")
         except Exception as e:
             msg = f"[Goiania] ERRO ao carregar credenciais do banco: {e}"
             print(f">>> {msg}")
-            self.log(msg, level="ERROR")
 
     def log(self, message, level="INFO", job_id=None, carteirinha_id=None):
         print(f"[{level}] {message}")
@@ -89,7 +92,7 @@ class UnimedScraper(BaseScraper):
         execute(self, {"job_id": None})
 
     def process_job(self, rotina, job_data):
-        job_id = job_data.get("job_id")
+        job_id = job_data.get("job_id") or job_data.get("id")
         start_time = datetime.now()
         
         execution = JobExecution(
@@ -104,6 +107,35 @@ class UnimedScraper(BaseScraper):
             self.db.commit()
         except: 
             self.db.rollback()
+
+        # Merge params (supports both JSONB dict and legacy text string)
+        import json
+        params_raw = job_data.get("params")
+        if params_raw:
+            if isinstance(params_raw, dict):
+                job_data.update(params_raw)
+            elif isinstance(params_raw, str):
+                try:
+                    parsed = json.loads(params_raw)
+                    if isinstance(parsed, dict):
+                        job_data.update(parsed)
+                except Exception as e:
+                    self.log(f"Failed to parse job params: {e}", level="WARN", job_id=job_id)
+
+        # Inject injected credentials
+        injected_login = job_data.get("login")
+        if injected_login:
+            self.username = injected_login
+            if job_data.get("senha_criptografada"):
+                from security_utils import decrypt_password
+                try:
+                    self.password = decrypt_password(job_data.get("senha_criptografada"))
+                except Exception:
+                    self.password = job_data.get("senha_criptografada")
+            self.log(f"Credenciais Goiania aplicadas a partir dos parametros do Job (login={self.username})", job_id=job_id)
+
+        if not self.username or not self.password:
+            self._load_credentials()
 
         results = []
         error_msg = None
