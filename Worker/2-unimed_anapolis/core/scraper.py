@@ -282,15 +282,15 @@ class UnimedAnopolisScraper(BaseScraper):
                 if not rotina:
                     rotina = "1"
                     
-                if rotina in ("0", "op0", "login_test"):
+                if str(rotina).lower() in ("0", "op0", "login_test", "op0_login"):
                     from op.op0_login import execute as op0_execute
                     results = op0_execute(self, job_data)
                 
-                elif rotina in ("1", "consulta_guias"):
+                elif str(rotina).lower() in ("1", "consulta_guias", "op1_consulta", "op1_consultar_guias"):
                     from op.op1_consulta import execute as op1_execute
                     results = op1_execute(self, job_data)
                     
-                elif str(rotina).lower() in ("2", "captura", "op2_captura"):
+                elif str(rotina).lower() in ("2", "captura", "op2_captura", "2", "op2_autorizar", "autorizar"):
                     from op.op2_captura import execute as op2_execute
                     results = op2_execute(self, job_data)
                     

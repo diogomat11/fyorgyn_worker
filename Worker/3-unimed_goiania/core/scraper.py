@@ -167,11 +167,11 @@ class UnimedScraper(BaseScraper):
                     if k.startswith("op.") or k == "op":
                         del sys.modules[k]
 
-                if rotina in ("0", "op0", "login_test"):
+                if str(rotina).lower() in ("0", "op0", "login_test", "op0_login"):
                     from op.op0_login import execute as op0_execute
                     results = op0_execute(self, job_data)
                     
-                elif rotina in ("1", "consulta_guias", "default"):
+                elif str(rotina).lower() in ("1", "consulta_guias", "default", "op1_consulta", "op1_consultar_guias"):
                     from op.op1_consulta import execute as op1_execute
                     try:
                         # Fast validation of session presence
@@ -183,7 +183,7 @@ class UnimedScraper(BaseScraper):
 
                     results = op1_execute(self, job_data)
                     
-                elif str(rotina).lower() in ("captura", "op2_captura", "2"):
+                elif str(rotina).lower() in ("captura", "op2_captura", "2", "op2_autorizar", "autorizar"):
                     from op.op2_captura import execute as op2_execute
                     results = op2_execute(self, job_data)
                     
