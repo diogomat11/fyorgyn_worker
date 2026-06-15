@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, DateTime, Time, ForeignKey, Text, Float, Boolean, JSON
+from sqlalchemy import Column, Integer, String, Date, DateTime, Time, ForeignKey, Text, Float, Boolean, JSON, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -40,17 +40,19 @@ class User(Base):
 
 class Carteirinha(Base):
     __tablename__ = "carteirinhas"
-    __table_args__ = {'extend_existing': True}
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    __table_args__ = (
+        UniqueConstraint('carteirinha', 'user_id', name='uq_carteirinha_user_id'),
+        {'extend_existing': True}
+    )
 
     id = Column(Integer, primary_key=True, index=True)
-    carteirinha = Column(Text, unique=True, nullable=False)
+    carteirinha = Column(Text, nullable=False)
     paciente = Column(Text)
     id_paciente = Column(Text, index=True)
     codigo_beneficiario = Column(Text, nullable=True) # ID of user in external system (e.g., IPASGO)
     status = Column(Text, default="ativo")
     id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="SET NULL"), nullable=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
@@ -64,18 +66,18 @@ class Carteirinha(Base):
 
 class Job(Base):
     __tablename__ = "jobs"
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = {'schema': 'worker', 'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
-    carteirinha_id = Column(Integer, ForeignKey("carteirinhas.id", ondelete="CASCADE"), nullable=True)
-    id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="SET NULL"), nullable=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    carteirinha_id = Column(Integer, ForeignKey("public.carteirinhas.id", ondelete="CASCADE"), nullable=True)
+    id_convenio = Column(Integer, ForeignKey("public.convenios.id_convenio", ondelete="SET NULL"), nullable=True)
+    user_id = Column(Integer, ForeignKey("public.users.id", ondelete="SET NULL"), nullable=True, index=True)
     rotina = Column(Text) # consulta_guias, autorizacao, etc.
     params = Column(JSONB, nullable=True) # Arbitrary JSON parameters
     status = Column(Text, nullable=False, default="pending", index=True) # success, pending, processing, error
     attempts = Column(Integer, default=0)
     priority = Column(Integer, default=0)
-    depending_id = Column(Integer, ForeignKey("jobs.id", ondelete="SET NULL"), nullable=True)
+    depending_id = Column(Integer, ForeignKey("worker.jobs.id", ondelete="SET NULL"), nullable=True)
     locked_by = Column(Text) # Server URL
     timeout = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -148,12 +150,12 @@ class PatientPei(Base):
 
 class Log(Base):
     __tablename__ = "logs"
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = {'schema': 'worker', 'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
-    job_id = Column(Integer, ForeignKey("jobs.id", ondelete="SET NULL"), nullable=True)
-    carteirinha_id = Column(Integer, ForeignKey("carteirinhas.id", ondelete="Set NULL"), nullable=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    job_id = Column(Integer, ForeignKey("worker.jobs.id", ondelete="SET NULL"), nullable=True)
+    carteirinha_id = Column(Integer, ForeignKey("public.carteirinhas.id", ondelete="SET NULL"), nullable=True)
+    user_id = Column(Integer, ForeignKey("public.users.id", ondelete="SET NULL"), nullable=True, index=True)
     level = Column(Text, default="INFO") # INFO, WARN, ERROR
     message = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -164,13 +166,13 @@ class Log(Base):
 
 class Worker(Base):
     __tablename__ = "workers"
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = {'schema': 'worker', 'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     hostname = Column(Text, unique=True, nullable=False)
     status = Column(Text, default="offline") # idle, processing, offline, error
     last_heartbeat = Column(DateTime(timezone=True), server_default=func.now())
-    current_job_id = Column(Integer, ForeignKey("jobs.id", ondelete="SET NULL"), nullable=True)
+    current_job_id = Column(Integer, ForeignKey("worker.jobs.id", ondelete="SET NULL"), nullable=True)
     command = Column(Text, nullable=True) # restart, stop, etc.
     meta = Column(Text, nullable=True) # JSON string for CPU, RAM, Version
     first_error_at = Column(DateTime(timezone=True), nullable=True)
@@ -223,10 +225,10 @@ class ConvenioOperacao(Base):
 
 class PriorityRule(Base):
     __tablename__ = "priority_rules"
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = {'schema': 'worker', 'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
-    id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="CASCADE"))
+    id_convenio = Column(Integer, ForeignKey("public.convenios.id_convenio", ondelete="CASCADE"))
     rotina = Column(Text)
     base_priority = Column(Integer, default=2)  # Starting priority level (0 = highest)
     escalation_minutes = Column(Integer, default=10)  # Minutes per priority step-up towards 0
@@ -245,11 +247,11 @@ class ServerConfig(Base):
     its preferred (id_convenio, rotina), maximising Chrome session reuse.
     """
     __tablename__ = "server_configs"
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = {'schema': 'worker', 'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     server_url = Column(Text, unique=True, nullable=False)  # e.g. "http://127.0.0.1:9000"
-    id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="SET NULL"), nullable=True)
+    id_convenio = Column(Integer, ForeignKey("public.convenios.id_convenio", ondelete="SET NULL"), nullable=True)
     rotina = Column(Text, nullable=True)  # NULL = any rotina for preferred convenio
     preference_bonus = Column(Integer, default=1)  # points subtracted from effective_priority for matching jobs
     is_active = Column(Boolean, default=True)
@@ -260,11 +262,11 @@ class ServerConfig(Base):
 
 class JobExecution(Base):
     __tablename__ = "job_executions"
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = {'schema': 'worker', 'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
-    job_id = Column(Integer, ForeignKey("jobs.id", ondelete="CASCADE"))
-    id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="SET NULL"), nullable=True)
+    job_id = Column(Integer, ForeignKey("worker.jobs.id", ondelete="CASCADE"))
+    id_convenio = Column(Integer, ForeignKey("public.convenios.id_convenio", ondelete="SET NULL"), nullable=True)
     rotina = Column(Text)
     status = Column(Text)
     start_time = Column(DateTime(timezone=True), server_default=func.now())
