@@ -151,17 +151,6 @@ def get_job_login(db, job):
                 login = params_dict.get("login") or params_dict.get("users_convenio_login")
         except Exception:
             pass
-    if not login and job.id_convenio and job.user_id:
-        try:
-            from models import UserConvenio
-            uconv = db.query(UserConvenio).filter(
-                UserConvenio.user_id == job.user_id,
-                UserConvenio.id_convenio == job.id_convenio
-            ).first()
-            if uconv:
-                login = uconv.login
-        except Exception:
-            pass
     return login
 
 
@@ -409,17 +398,6 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
         try:
             params_dict = params if isinstance(params, dict) else (_json.loads(params) if params else {})
             
-            # Inject credentials directly into params for Bradesco to avoid double-fetching and ensure they arrive in the payload
-            # Only inject if login/senha_criptografada are not already provided in the parameters
-            if id_convenio == 1 and user_id:
-                if not params_dict.get("login") or not params_dict.get("senha_criptografada"):
-                    from models import UserConvenio
-                    uconv = db.query(UserConvenio).filter(UserConvenio.user_id == user_id, UserConvenio.id_convenio == 1).first()
-                    if uconv:
-                        params_dict["login"] = uconv.login
-                        params_dict["senha_criptografada"] = uconv.senha_criptografada
-                        params_dict["cod_prestador"] = uconv.cod_prestador
-                    
             params_str = _json.dumps(params_dict)
 
             # Skip base_guias sync/save for Bradesco OP1 Fature
