@@ -148,14 +148,18 @@ def run(scraper, job_data):
                 data_fim_lote = None
                 if all_items:
                     try:
-                        from datetime import datetime
+                        from datetime import datetime, date
                         datas = []
                         for item in all_items:
-                            dt_str = item.get('dataRealizacao', '')
-                            if dt_str:
-                                # Tenta parsear, assumindo ISO format ou prefixo
-                                dt = datetime.fromisoformat(dt_str.split('T')[0])
-                                datas.append(dt.date())
+                            dt_val = item.get('dataRealizacao')
+                            if dt_val:
+                                if isinstance(dt_val, str):
+                                    dt = datetime.fromisoformat(dt_val.split('T')[0])
+                                    datas.append(dt.date())
+                                elif isinstance(dt_val, datetime):
+                                    datas.append(dt_val.date())
+                                elif isinstance(dt_val, date):
+                                    datas.append(dt_val)
                         if datas:
                             data_inicio_lote = min(datas)
                             data_fim_lote = max(datas)

@@ -234,7 +234,7 @@ class BradescoScraper(BaseScraper):
                     if not self.driver or getattr(self.driver, 'session_id', None) is None:
                         try:
                             from server import sel_manager
-                            self.driver = sel_manager.get_driver(self.id_convenio, headless=self.headless)
+                            self.driver = sel_manager.get_driver(self.id_convenio, headless=self.headless, user_id=self.user_id)
                         except Exception as pool_err:
                             self.log(f"Using isolated driver mode: {pool_err}", level="WARN", job_id=job_id)
 

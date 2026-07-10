@@ -56,3 +56,16 @@ def process_job(self, rotina, job_data):
 ```
 
 Seguindo este modelo, evitamos os bugs de "Sessão Expirada" com requisições fantasmas pelo Dispatcher, reduzindo interações mortas na fila do banco de dados.
+
+## 4. Multi-Operadoras e Parâmetros Complexos (registro_ans e Anexos)
+
+### 4.1 Sub-operadoras e Registro ANS
+Quando um convênio possui variações ou sub-operadoras no mesmo portal (ex: Bradesco Saúde com ANS `005711`, Bradesco Operadora com ANS `421715`, Mediservice com ANS `333689` no portal Orizon):
+- **Banco de Dados**: O campo `registro_ans` na tabela `convenios` deve ser populado com o código ANS correspondente.
+- **Worker**: O script deve ler o `RegistroAns` dos parâmetros (`params` serializado no payload do Job) enviados pelo frontend, garantindo que o mesmo código de worker (ex: `1-bradesco`) atenda a múltiplos cadastros de convênio de forma dinâmica.
+
+### 4.2 Arquivos Remotos e Uploads (RM / AI / RC)
+Quando a rotina exige o envio de arquivos anexados (ex: Pedido Médico / Relatório Médico `caminho_arquivo_RM`):
+- **Frontend**: O modal de solicitações envia o arquivo físico para `/jobs/upload-anexo` e recebe uma URL relativa. A URL absoluta (resolvida com o backend host) deve ser repassada nos parâmetros.
+- **Worker**: O worker deve validar se o parâmetro do arquivo inicia com `http://` ou `https://` e realizar o download para um arquivo temporário local (`tempfile.NamedTemporaryFile`) antes de injetar o caminho físico no campo do Selenium.
+

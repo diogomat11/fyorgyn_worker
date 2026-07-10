@@ -728,7 +728,8 @@ def run(scraper: 'BaseScraper', job_data: dict) -> list[dict]:
         # enviar por página e registrar log corretamente
         page_rows_complete = [r for r in page_rows if _is_row_complete(r)]
         if page_rows_complete:
-            _save_rows_local(page_rows_complete, logger, job_user_id=getattr(scraper, 'user_id', None) or job_data.get("user_id"))
+            # _save_rows_local(page_rows_complete, logger, job_user_id=getattr(scraper, 'user_id', None) or job_data.get("user_id"))
+            pass
         
         # Salvando Estado de Navegação Localmente
         try:

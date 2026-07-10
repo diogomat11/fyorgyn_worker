@@ -4,6 +4,7 @@ import importlib.util
 from datetime import datetime
 import json
 import time
+import requests
 
 # ── Isolate Environment (Ensure base imports from Worker/ root) ──
 _worker_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -15,22 +16,23 @@ from models import Convenio, JobExecution, UserConvenio
 from security_utils import decrypt_password
 from database import SessionLocal
 
-class IpasgoScraper(BaseScraper):
-    def __init__(self, id_convenio=6, db=None, headless=True, user_id=None):
+class EvoluirScraper(BaseScraper):
+    def __init__(self, id_convenio=100, db=None, headless=True, user_id=None):
         super().__init__(id_convenio, db, headless, user_id)
-        # Use provided DB or create a fresh local session
         self.db = db if db else SessionLocal()
-        self.user_id = user_id  # Owner do job atual
+        self.user_id = user_id
         self.username = None
         self.password = None
         self.cod_prestador = None
         self._load_credentials()
-        self.module_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # 6-ipasgo root
+        self.module_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
+        # Híbrido HTTP Requests
+        self.session = requests.Session()
+        self.csrf_token = None
+        self.auth_token = None
 
     def _load_credentials(self):
-        """
-        Busca credenciais na user_convenios (por user_id).
-        """
         try:
             if self.user_id:
                 user_conv = self.db.query(UserConvenio).filter(
@@ -41,22 +43,13 @@ class IpasgoScraper(BaseScraper):
                     self.username = user_conv.login
                     self.password = decrypt_password(user_conv.senha_criptografada)
                     self.cod_prestador = user_conv.cod_prestador
-                    self.log(f"Credenciais carregadas de user_convenios (user_id={self.user_id}, prestador={self.cod_prestador})")
+                    self.log(f"Credenciais Evoluir carregadas (user_id={self.user_id})")
                     return
-                else:
-                    self.log(f"Registro user_convenios encontrado mas incompleto para user_id={self.user_id} e convenio={self.id_convenio}. Login={getattr(user_conv, 'login', 'N/A') if user_conv else 'NOT FOUND'}", level="ERROR")
-            else:
-                self.log(f"user_id nao fornecido ao scraper — nao foi possivel carregar credenciais", level="ERROR")
-            self.log(f"Credenciais nao encontradas em user_convenios para user_id={self.user_id} e convenio={self.id_convenio}", level="ERROR")
+            self.log(f"Credenciais Evoluir nao encontradas para user_id={self.user_id}", level="ERROR")
         except Exception as e:
-            self.log(f"IPASGO Credential Load Error: {e}", level="ERROR")
+            self.log(f"Evoluir Credential Load Error: {e}", level="ERROR")
 
     def reload_credentials(self, user_id):
-        """
-        Recarrega credenciais para um user_id diferente.
-        Chamado pelo server.py antes de processar cada job para garantir que
-        a sessão reutilizada do Chrome use as credenciais corretas do tenant.
-        """
         self.user_id = user_id
         self.username = None
         self.password = None
@@ -80,7 +73,7 @@ class IpasgoScraper(BaseScraper):
                     carteirinha_id=carteirinha_id,
                     user_id=self.user_id,
                     level=level,
-                    message=f"[IPASGO] {message}"
+                    message=f"[Evoluir] {message}"
                 )
                 self.db.add(log_entry)
                 self.db.commit()
@@ -89,11 +82,10 @@ class IpasgoScraper(BaseScraper):
                 except: pass
 
     def login(self):
-        """Executes OP0 login routine."""
+        """Executes OP0 login routine via Selenium to capture session cookies."""
         return self.execute_op("op0_login", {"job_id": "internal_login"})
 
     def execute_op(self, op_name, job_data):
-        """Generic OP loader and executor."""
         op_file = f"{op_name}.py"
         op_path = os.path.join(self.module_path, "op", op_file)
         
@@ -104,7 +96,6 @@ class IpasgoScraper(BaseScraper):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         
-        # Try 'run' or 'execute'
         func = getattr(module, "run", None) or getattr(module, "execute", None)
         if not func:
             raise AttributeError(f"Módulo {op_name} não possui função 'run' ou 'execute'")
@@ -129,7 +120,7 @@ class IpasgoScraper(BaseScraper):
             self.db.rollback()
             self.log(f"Failed to record execution start: {e}", level="ERROR", job_id=job_id)
 
-        # Merge params (supports both JSONB dict and legacy text string)
+        # Merge params
         params_raw = job_data.get("params")
         if params_raw:
             if isinstance(params_raw, dict):
@@ -146,63 +137,68 @@ class IpasgoScraper(BaseScraper):
         error_msg = None
         error_cat = "scraper_error"
 
-        # Map routine strings to op names
-        op_map = {
-            "0": "op0_login",
-            "1": "op1_autorizar_facplan",
-            "2": "op2_open_facplan",
-            "3": "op3_import_guias",
-            "4": "op4_confirma_guia",
-            "5": "op5_impress_guia",
-            "6": "op6_check_baixados",
-            "7": "op7_fat_facplan",
-            "8": "op8_check_facplan",
-            "9": "op9_anexos_facplan",
-            "10": "op10_recurso_glosa",
-            "11": "op11_import_guias_api",
-            "12": "op12_impressao_api",
-            "13": "op13_criar_lote",
-            "14": "op14_cancelar_lote",
-            "13_poll": "op13_poll_lote",
-            "Execução": "op4_confirma_guia",
-            "execucao": "op4_confirma_guia",
-            "execução": "op4_confirma_guia",
-            "Captura": "op3_import_guias",
-            "captura": "op3_import_guias",
-            "Impressão": "op5_impress_guia",
-            "impressao": "op5_impress_guia",
-            "impressão": "op5_impress_guia",
-        }
-        
-        op_name = op_map.get(str(rotina))
-        if not op_name:
-            # Fallback for named routines
-            if rotina.startswith("op"):
-                op_name = rotina
-            else:
-                op_name = f"op{rotina}"
+        # Map routines (op0, op1, op2, etc.)
+        op_name = rotina if rotina.startswith("op") else f"op{rotina}"
+
+        # Try to restore session from existing driver cookies/token
+        if self.driver and getattr(self.driver, 'session_id', None) is not None:
+            try:
+                selenium_cookies = self.driver.get_cookies()
+                has_session = any(c['name'] == 'evoluir_session' for c in selenium_cookies)
+                if has_session:
+                    self.session.cookies.clear()
+                    xsrf_val = None
+                    for cookie in selenium_cookies:
+                        self.session.cookies.set(cookie['name'], cookie['value'])
+                        if cookie['name'] == 'XSRF-TOKEN':
+                            import urllib.parse
+                            xsrf_val = urllib.parse.unquote(cookie['value'])
+                    
+                    # Atualizar headers para emular perfeitamente o navegador
+                    self.session.headers.update({
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                        "Referer": "https://sistemaevoluir.com.br/painel",
+                        "Accept": "application/json, text/plain, */*"
+                    })
+                    if xsrf_val:
+                        self.session.headers.update({"X-XSRF-TOKEN": xsrf_val})
+                    
+                    auth_token = self.driver.execute_script("return window.dashboardAuthHeader || '';")
+                    if auth_token:
+                        self.auth_token = auth_token
+                        self.session.headers.update({"Authorization": auth_token})
+                        
+                    csrf = self.driver.execute_script("return document.querySelector('input[name=\"_token\"]')?.value || '';")
+                    if csrf:
+                        self.csrf_token = csrf
+                        
+                    self.log("Sessão HTTP restaurada com sucesso a partir do Chrome ocioso.", job_id=job_id)
+            except Exception as e:
+                self.log(f"Aviso ao tentar restaurar sessão do driver: {e}", level="WARN", job_id=job_id)
 
         for attempt in range(self.max_retries):
             try:
-                # Check session
-                need_login = attempt > 0
-                if not need_login:
-                    try:
-                        url = self.driver.current_url if self.driver else "data:,"
-                        if url.startswith("data:") or "login" in url.lower() or "ipasgo" not in url.lower():
-                            need_login = True
-                    except:
-                        need_login = True
-
+                # Se não houver cookies/token na sessão, força OP0_Login para carregar o contexto
+                need_login = attempt > 0 or not self.csrf_token or len(self.session.cookies) == 0
+                
+                # Double check se o driver Selenium está de fato instanciado e vivo para rodar a OP0
                 if need_login:
-                    if not self.driver or getattr(self.driver, 'session_id', None) is None:
+                    driver_alive = False
+                    if self.driver and getattr(self.driver, 'session_id', None) is not None:
+                        try:
+                            self.driver.title
+                            driver_alive = True
+                        except Exception:
+                            pass
+                            
+                    if not driver_alive:
                         try:
                             from server import sel_manager
                             self.driver = sel_manager.get_driver(self.id_convenio, headless=self.headless, user_id=self.user_id)
                         except Exception as pool_err:
-                            self.log(f"Using isolated driver mode: {pool_err}", level="WARN", job_id=job_id)
-                            # Logic for starting isolated driver if needed could go here
+                            self.log(f"Failed to acquire Selenium driver: {pool_err}", level="WARN", job_id=job_id)
                     
+                    self.log("Sessão HTTP expirada ou ausente. Iniciando login via Selenium...")
                     self.login()
                 
                 # Execute mapped OP
@@ -234,4 +230,3 @@ class IpasgoScraper(BaseScraper):
             raise Exception(f"Job failed internally: {error_msg}")
             
         return results
-

@@ -6,9 +6,10 @@
 # LOGIN PAGE
 # ===========================
 # IPASGO Prestador (OutSystems)
-X_LOGIN_USERNAME = '//*[@id="SilkUIFramework_wt13_block_wtUsername_wtUserNameInput2"]'
-X_LOGIN_PASSWORD = '//*[@id="SilkUIFramework_wt13_block_wtPassword_wtPasswordInput"]'
-X_LOGIN_BUTTON   = '//*[@id="SilkUIFramework_wt13_block_wtAction_wtLoginButton"]'
+
+X_LOGIN_USERNAME = '//*[@id="wtUserNameInput2"]'
+X_LOGIN_PASSWORD = '//*[@id="wtPasswordInput"]'
+X_LOGIN_BUTTON   = '//*[@id="wtLoginButton"]'
 
 # Mensagens de erro / validação
 X_LOGIN_ERROR_MESSAGE = '//*[contains(@class, "error") or contains(@id, "msgErro")]'
@@ -35,10 +36,9 @@ X_IMPORT_TABELA_RESULTADOS = '//table[contains(@class, "resultados") or contains
 X_IMPORT_ALERT_SUCESSO = '//*[contains(@class, "alert-success")]'
 X_IMPORT_ALERT_ERRO = '//*[contains(@class, "alert-danger") or contains(@class, "alert-error")]'
 X_ALERT_CLOSE = '//*[contains(@class,"close") or contains(@class,"fechar") or contains(@class,"fa-times") or @id="alertClose" or @aria-label="Fechar"]'
-
 # Link que abre módulo principal (FacPlan) em nova aba
-X_FACPLAN_LINK = '//*[contains(@href, "facplan") or contains(., "FacPlan") or contains(., "FACPLAN")]'
-X_FACPLAN_LINK_ABS = '/html/body/form/div[3]/div/div[2]/div/div[2]/div/div/span/div[6]/div/div[2]/div[2]/div/div/div[2]/table/tbody/tr[2]/td/div/a'
+X_FACPLAN_LINK = '//*[contains(@href, "facplan") or contains(@href, "webplan") or contains(., "FacPlan") or contains(., "FACPLAN") or contains(., "WebPlan") or contains(., "Webplan")]'
+X_FACPLAN_LINK_ABS = '/html/body/form/div[3]/div/div[4]/div/div[2]/div/div/span/div[6]/div/div[2]/div[2]/div/div/div[2]/table/tbody/tr[2]/td/div/a'
 
 
 # ===========================
@@ -98,6 +98,71 @@ X_PAGINA_ANTERIOR = '//a[contains(@class, "prev") or contains(text(), "Anterior"
 # Busca
 X_CAMPO_BUSCA = '//input[contains(@placeholder, "Buscar") or contains(@id,"search")]'
 X_BOTAO_BUSCAR = '//button[contains(text(), "Buscar") or contains(@id,"btnSearch")]'
+
+
+
+# ===========================
+# OP1 - AUTORIZAR FACPLAN (GuiaSPSADT)
+# ===========================
+X_AUTFACPLAN_URL               = "https://novowebplanipasgo.facilinformatica.com.br/GuiasTISS/GuiaSPSADT/ViewGuiaSPSADT"
+
+# Etapa 1 — Carteira / Dados iniciais
+X_AUTFACPLAN_CLICK_CARTAO      = '//*[@id="div_numeroDaCarteira"]/div/i'
+X_AUTFACPLAN_INPUT_CARTEIRA    = '//*[@id="cartao"]'
+X_AUTFACPLAN_NOME_BENEF        = '//*[@id="nomeDoBeneficiario"]'
+X_AUTFACPLAN_CARAT_ATEND       = '//*[@id="caraterAtendimento"]'
+X_AUTFACPLAN_CARAT_ATEND_OPT2  = '//*[@id="caraterAtendimento"]/option[2]'
+X_AUTFACPLAN_DATA_SOLICIT      = '/html/body/main/div[2]/div[1]/div[7]/div[2]/div/input'
+X_AUTFACPLAN_INDICACAO_CLIN    = '//*[@id="indicacaoClinica"]'
+
+# Etapa 2 — Procedimento
+X_AUTFACPLAN_MENU_PROC         = '//*[@id="ui-accordion-accordion-header-2"]'
+X_AUTFACPLAN_BTN_INCLUIR_PROC  = '//*[@id="incluirProcedimento"]'
+X_AUTFACPLAN_INPUT_COD_PROC    = '//*[@id="registroProcedimentoCodigo"]/input'
+X_AUTFACPLAN_INPUT_QT_PROC     = '//*[@id="registroProcedimentoQuantidade"]/input'
+X_AUTFACPLAN_BTN_CONF_PROC     = '//*[@id="confirmarEdicaoDeProcedimento"]'
+X_AUTFACPLAN_SPAN_MSG_GENERICA = '//*[@id="spanTextoMensagemGenerica"]'
+
+# Etapa 3 — Profissional executante
+X_AUTFACPLAN_MENU_EXEC         = '//*[@id="ui-accordion-accordion-header-3"]'
+X_AUTFACPLAN_BTN_INCLUIR_PROF  = '//*[@id="incluirProfissional"]'
+X_AUTFACPLAN_INPUT_GRAU        = '//*[@id="registroProfissionalGrauParticipacao"]/input'
+X_AUTFACPLAN_INPUT_COD_PROF    = '//*[@id="registroProfissionalCodigo"]/input'
+X_AUTFACPLAN_INPUT_CBO         = '//*[@id="registroProfissionalCodCBO"]/input'
+X_AUTFACPLAN_BTN_CONF_PROF     = '//*[@id="confirmarEdicaoDeProfissional"]'
+X_AUTFACPLAN_BTN_CANCEL_PROF   = '//*[@id="cancelarEdicaoDeProfissional"]'
+X_AUTFACPLAN_BTN_EXCLUIR_PROF  = '//*[@id="excluirProfissional"]'
+
+# Etapa 4 — Justificativa Clínica
+X_AUTFACPLAN_MENU_JUST         = '//*[@id="ui-accordion-accordion-header-4"]'
+X_AUTFACPLAN_INPUT_JUST        = '//*[@id="observacao"]'
+
+# Etapa 5a — Observação adicional
+X_AUTFACPLAN_TITLE_OBS         = '//*[@id="informacoesAdicionaisTitle"]'
+X_AUTFACPLAN_INPUT_OBS         = '//*[@id="observacaoAdicional"]'
+
+# Etapa 5b — Contato auditoria
+X_AUTFACPLAN_TITLE_AUDIT       = '//*[@id="contatoAuditoriaTitle"]'
+X_AUTFACPLAN_INPUT_AUDIT       = '//*[@id="contatoAuditoriaJustificativa"]'
+
+# Etapas 6/7/8 — Anexos
+X_AUTFACPLAN_SELECT_TIPO_ANX   = '//*[@id="tipoAnexoGuiaUpload"]'
+X_AUTFACPLAN_TIPO_RM_OPT       = '//*[@id="tipoAnexoGuiaUpload"]/option[47]'  # Pedido médico (RM)
+X_AUTFACPLAN_TIPO_AI_OPT       = '//*[@id="tipoAnexoGuiaUpload"]/option[35]'  # Avaliação inicial (AI)
+X_AUTFACPLAN_TIPO_RC_OPT       = '//*[@id="tipoAnexoGuiaUpload"]/option[57]'  # Relatório clínico (RC)
+X_AUTFACPLAN_INPUT_CAMINHO     = '//*[@id="upload_form"]/div/input[1]'
+X_AUTFACPLAN_BTN_INCLUIR_ANX   = '//*[@id="upload_form"]/div/input[2]'
+X_AUTFACPLAN_SPINNER_ANX       = '//*[@id="upload_form"]/div/img'
+
+# Gravar + Confirmar
+X_AUTFACPLAN_BTN_GRAVAR        = '//*[@id="btnGravar"]'
+X_AUTFACPLAN_BTN_CONFIRMAR     = '/html/body/div[8]/div[3]/div/button[1]'
+
+# Diálogo de resultado após gravação
+X_AUTFACPLAN_DIALOG_NUM_GUIA   = '//*[@id="dialogText"]/div[2]'
+X_AUTFACPLAN_DIALOG_GUIA_PREST = '//*[@id="dialogText"]/div[3]'
+X_AUTFACPLAN_DIALOG_DATA_SOL   = '//*[@id="dialogText"]/div[4]'
+X_AUTFACPLAN_BTN_FECHAR_DIALOG = '/html/body/div[8]/div[1]/button'
 
 
 # ===========================

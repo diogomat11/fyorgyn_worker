@@ -98,7 +98,7 @@ def process_job(job: JobRequest):
         # that already have a session for the requested convenio.
         is_headless = os.environ.get("SGUCARD_HEADLESS", "true").lower() == "true"
         
-        driver = sel_manager.get_driver(job.id_convenio, headless=is_headless)
+        driver = sel_manager.get_driver(job.id_convenio, headless=is_headless, user_id=job.user_id)
         
         # 2. Get Scraper Instance (generic — determined by job.id_convenio)
         scraper = ScraperFactory.get_scraper(job.id_convenio, db=db, headless=is_headless, user_id=job.user_id)

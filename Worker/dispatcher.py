@@ -151,12 +151,12 @@ def get_job_login(db, job):
                 login = params_dict.get("login") or params_dict.get("users_convenio_login")
         except Exception:
             pass
-    if not login and job.id_convenio == 1 and job.user_id:
+    if not login and job.id_convenio and job.user_id:
         try:
             from models import UserConvenio
             uconv = db.query(UserConvenio).filter(
                 UserConvenio.user_id == job.user_id,
-                UserConvenio.id_convenio == 1
+                UserConvenio.id_convenio == job.id_convenio
             ).first()
             if uconv:
                 login = uconv.login
@@ -180,9 +180,10 @@ def retry_failed_jobs(db):
         # We explicitly IGNORE locked_by here, because if they are in 'error', the lock is a ghost.
         # Add a 20s cooldown so rapid failures don't instantly loop the queue
         threshold = datetime.now(timezone.utc) - timedelta(seconds=20)
+        from sqlalchemy import or_
         failed_jobs = db.query(Job).filter(
             Job.status == "error",
-            Job.attempts < 3,
+            or_(Job.attempts == None, Job.attempts < 3),
             Job.updated_at < threshold
         ).all()
         
@@ -191,6 +192,7 @@ def retry_failed_jobs(db):
             for job in failed_jobs:
                 job.status = "pending"
                 job.locked_by = None
+                job.attempts = job.attempts or 0
                 job.updated_at = datetime.now(timezone.utc)
             db.commit()
     except Exception as e:
@@ -239,7 +241,7 @@ def recover_stuck_jobs(db):
         if stuck_jobs:
             logger.info(f"Recovering {len(stuck_jobs)} jobs frozen in 'processing'...")
             for job in stuck_jobs:
-                job.status = "error" if job.attempts >= 3 else "pending"
+                job.status = "error" if (job.attempts or 0) >= 3 else "pending"
                 job.locked_by = None
                 job.updated_at = datetime.now(timezone.utc)
             db.commit()
@@ -463,7 +465,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 # Worker is strictly busy. Dispatcher overlapped requests (Race Condition)
                 current_job.status = "pending"
                 current_job.locked_by = None
-                current_job.attempts = max(0, current_job.attempts - 1) # Refund the attempt
+                current_job.attempts = max(0, (current_job.attempts or 0) - 1) # Refund the attempt
                 db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="WARN", message="Worker Port returned 409 Busy -> Retornando Job para fila Pending."))
                 current_job.updated_at = datetime.now(timezone.utc)
                 db.commit()
@@ -472,8 +474,18 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
             if data.get("status") == "success":
                 current_job.status = "success"
                 current_job.locked_by = None
+                current_job.result_data = data
                 current_job.updated_at = datetime.now(timezone.utc)
                 results = data.get("data", [])
+                
+                # Normaliza results se for dict
+                if isinstance(results, dict):
+                    if "op11_data" in results and isinstance(results["op11_data"], list):
+                        results = results["op11_data"]
+                    elif "data" in results and isinstance(results["data"], list):
+                        results = results["data"]
+                    else:
+                        results = [results]
                 
                 # ── Log the full JSON response from the worker ──
                 try:
@@ -501,170 +513,32 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                     elif is_bradesco_fature:
                         db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="INFO", message="Sync completo. Resultados retornados no payload (gravação em base_guias ignorada para faturamento Bradesco)."))
                         db.commit()
+                    elif id_convenio == 100:
+                        db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="INFO", message="Sync completo. Resultados da Evoluir salvos no result_data do Job (sincronização efetuada em background pelo backend)."))
+                        db.commit()
                     else:
-                        count_inserted = 0
-                        count_updated = 0
-                    
-                        def parse_date(date_str):
-                            if not date_str or not isinstance(date_str, str): return None
-                            try: return datetime.strptime(date_str.strip(), "%d/%m/%Y").date()
-                            except: return None
+                        # Em vez de fazer o parse e gravação no base_guias localmente no worker,
+                        # delegamos a gravação ao backend enviando o resultado via webhook HTTP POST.
+                        db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="INFO",
+                                   message=f"Job concluído com sucesso. Enviando dados via webhook ao backend para processamento..."))
+                        db.commit()
                         
-                        def parse_int_safe(val, default=0):
-                            try:
-                                clean = str(val).strip()
-                                if not clean or clean.lower() in ["none", "null"]: return default
-                                return int(clean)
-                            except:
-                                return default
-                            
-                        def parse_date_robust(date_str):
-                            if not date_str or not isinstance(date_str, str): return None
-                            clean = date_str.strip()[:10]
-                            try:
-                                if "-" in clean: return datetime.strptime(clean, "%Y-%m-%d").date()
-                                return datetime.strptime(clean, "%d/%m/%Y").date()
-                            except: return None
-
-                        for item in results:
-                            try:
-                                qtd_solic_val = parse_int_safe(item.get("qtde_solicitada", item.get("qtde_solicitado")), 0)
-                                qtd_aut_val = parse_int_safe(item.get("qtde_autorizada", item.get("sessoes_autorizadas", item.get("qtde_autorizado"))), 0)
-                                guia_num = str(item.get("numero_guia", item.get("guia", ""))).strip()
-                                data_auth_parsed = parse_date_robust(item.get("data_autorizacao"))
-                                validade_parsed = parse_date_robust(item.get("validade_senha", item.get("data_validade", item.get("validade"))))
-                                senha_val = str(item.get("senha", "")).strip() if item.get("senha") else None
-                                codigo_terapia_val = item.get("codigo_terapia", item.get("codigo_procedimento"))
-                                nome_terapia_val = item.get("nome_terapia")
-                                codigo_benef = item.get("codigo_beneficiario")
-                                guia_prestador_val = item.get("guia_prestador")
-                                
-                                status_guia_val = str(item.get("status_guia", item.get("status", "Autorizado"))).strip()
-                                
-                                # Map Orizon/Bradesco numeric status or prefer description
-                                if id_convenio == 1:
-                                    if item.get("descricao"):
-                                        status_guia_val = str(item.get("descricao")).strip()
-                                    elif status_guia_val == "5" or status_guia_val.upper() == "EXPORTADA":
-                                        status_guia_val = "Exportada"
-                                    elif status_guia_val == "4" or status_guia_val.upper() == "LIBERADA":
-                                        status_guia_val = "Liberada"
-                                    elif status_guia_val == "199" or status_guia_val.upper() == "PENDENTE":
-                                        status_guia_val = "Pendente"
-                                
-                                # Resolve dynamic Carteirinha ID for standalone jobs spanning full portal
-                                current_cid = carteirinha_id
-                                if not current_cid and codigo_benef:
-                                    cart = db.query(Carteirinha).filter(
-                                        Carteirinha.codigo_beneficiario == codigo_benef,
-                                        Carteirinha.user_id == user_id
-                                    ).first()
-                                    if cart:
-                                        current_cid = cart.id
-
-                                # ── Busca em 2 fases para evitar duplicatas ──
-                                existing_guia = None
-                                
-                                # Fase 1: Match exato (guia + codigo_terapia + owner)
-                                if current_cid:
-                                    filters = [
-                                        BaseGuia.carteirinha_id == current_cid,
-                                        BaseGuia.id_convenio == id_convenio,
-                                        BaseGuia.guia == guia_num
-                                    ]
-                                    if codigo_terapia_val:
-                                        filters.append(BaseGuia.codigo_terapia == codigo_terapia_val)
-                                    existing_guia = db.query(BaseGuia).filter(*filters).first()
-                                elif codigo_benef:
-                                    filters = [
-                                        BaseGuia.codigo_beneficiario == codigo_benef,
-                                        BaseGuia.id_convenio == id_convenio,
-                                        BaseGuia.guia == guia_num
-                                    ]
-                                    if codigo_terapia_val:
-                                        filters.append(BaseGuia.codigo_terapia == codigo_terapia_val)
-                                    existing_guia = db.query(BaseGuia).filter(*filters).first()
-                                
-                                # Fase 2: Fallback — buscar com codigo_terapia NULL/vazio
-                                # (registros criados por OP3 que não tinham o código)
-                                if not existing_guia and codigo_terapia_val:
-                                    from sqlalchemy import or_
-                                    fallback_filters = [
-                                        BaseGuia.id_convenio == id_convenio,
-                                        BaseGuia.guia == guia_num,
-                                        or_(
-                                            BaseGuia.codigo_terapia == None,
-                                            BaseGuia.codigo_terapia == ""
-                                        )
-                                    ]
-                                    if current_cid:
-                                        fallback_filters.append(BaseGuia.carteirinha_id == current_cid)
-                                    elif codigo_benef:
-                                        fallback_filters.append(BaseGuia.codigo_beneficiario == codigo_benef)
-                                    existing_guia = db.query(BaseGuia).filter(*fallback_filters).first()
-
-                                if existing_guia:
-                                    # Claim ownership or skip if owned by another user
-                                    if existing_guia.user_id is None:
-                                        existing_guia.user_id = user_id
-                                    elif existing_guia.user_id != user_id:
-                                        logger.warning(f"Guia {guia_num} pertence ao usuario {existing_guia.user_id}, mas o job atual e do usuario {user_id}. Atualizacao ignorada.")
-                                        continue
-                                    
-                                    existing_guia.data_autorizacao = data_auth_parsed
-                                    existing_guia.senha = senha_val
-                                    existing_guia.status_guia = status_guia_val
-                                    existing_guia.validade = validade_parsed
-                                    existing_guia.codigo_terapia = codigo_terapia_val
-                                    existing_guia.qtde_solicitada = qtd_solic_val
-                                    existing_guia.sessoes_autorizadas = qtd_aut_val
-                                    if nome_terapia_val:
-                                        existing_guia.nome_terapia = nome_terapia_val
-                                    if codigo_benef:
-                                        existing_guia.codigo_beneficiario = codigo_benef
-                                    if guia_prestador_val:
-                                        existing_guia.guia_prestador = guia_prestador_val
-                                    if current_cid and not existing_guia.carteirinha_id:
-                                        existing_guia.carteirinha_id = current_cid
-                                    existing_guia.updated_at = datetime.now(timezone.utc)
-                                    count_updated += 1
-                                else:
-                                    if status_guia_val.upper() not in ["AUTORIZADO", "EM ESTUDO", "SOLICITADO", "EM AVALIAÇÃO", "EM APROVAÇÃO E AGUARDANDO P", "NEGADO", "CANCELADO", "EXPORTADA", "EXPORTADO", "PENDENTE", "FATURADA", "LIBERADA"]:
-                                        continue
-                                    
-                                    new_guia = BaseGuia(
-                                        id_convenio=id_convenio,
-                                        carteirinha_id=current_cid,
-                                        guia=guia_num,
-                                        guia_prestador=guia_prestador_val,
-                                        codigo_beneficiario=codigo_benef,
-                                        data_autorizacao=data_auth_parsed,
-                                        senha=senha_val,
-                                        status_guia=status_guia_val,
-                                        validade=validade_parsed,
-                                        codigo_terapia=codigo_terapia_val,
-                                        nome_terapia=nome_terapia_val,
-                                        qtde_solicitada=qtd_solic_val,
-                                        sessoes_autorizadas=qtd_aut_val,
-                                        user_id=user_id,
-                                        created_at=datetime.now(timezone.utc)
-                                    )
-                                    db.add(new_guia)
-                                    count_inserted += 1
-                            except Exception as item_e:
-                                import traceback
-                                trace_str = traceback.format_exc()
-                                logger.error(f"Error processing item: {item_e}\n{trace_str}")
-                                db.rollback()
-                                db.add(Log(
-                                    job_id=job_id, 
-                                    carteirinha_id=carteirinha_id, 
-                                    level="ERROR", 
-                                    message=f"Item falhou guia {item.get('numero_guia')}: {item_e} | Payload: {str(item)[:200]}"
-                                ))
-                                db.commit()
-
-                        db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="INFO", message=f"Sync complete. Inserted: {count_inserted}, Updated: {count_updated}"))
+                        try:
+                            webhook_url = f"{BACKEND_API_URL}/jobs/{job_id}/result"
+                            logger.info(f"Sending webhook to {webhook_url}")
+                            webhook_resp = requests.post(webhook_url, json=data, timeout=30)
+                            if webhook_resp.status_code == 200:
+                                db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="INFO",
+                                           message=f"Webhook enviado e processado pelo backend com sucesso."))
+                            else:
+                                db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="WARN",
+                                           message=f"Backend retornou status {webhook_resp.status_code} no webhook. O processamento ocorrerá via sync service em background."))
+                            db.commit()
+                        except Exception as webhook_err:
+                            logger.error(f"Erro ao enviar webhook ao backend: {webhook_err}")
+                            db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="WARN",
+                                       message=f"Falha de conexão ao enviar webhook ao backend: {str(webhook_err)}. O processamento ocorrerá via sync service em background."))
+                            db.commit()
                         db.commit()
                 except Exception as save_e:
                     logger.error(f"Error saving results: {save_e}")
@@ -680,7 +554,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 
                 # Regra de Negócio PO: Interromper Retentativas para erros Fatais (Carteira Inválida)
                 if "carteira inv" in err_msg.lower() or "dígito" in err_msg.lower() or "invalida" in err_msg.lower():
-                    current_job.attempts = max(3, current_job.attempts)
+                    current_job.attempts = max(3, current_job.attempts or 0)
                 
                 # Log the full JSON response for debugging
                 try:
@@ -812,6 +686,14 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                         for s in idle_servers:
                             s_meta = server_status_map[s]
                             if s_meta.get("last_convenio_id") == 1 and s_meta.get("last_login") == job_login:
+                                return s
+                    elif job_login:
+                        # Para outros convênios, preferir worker com o mesmo convênio, mesmo login e mesmo user_id (para evitar misturar sessões)
+                        for s in idle_servers:
+                            s_meta = server_status_map[s]
+                            if (s_meta.get("last_convenio_id") == job.id_convenio and 
+                                s_meta.get("last_login") == job_login and 
+                                s_meta.get("last_user_id") == job.user_id):
                                 return s
 
                     # 2. Prefer idle server with NO active session for this convenio (clean slate)

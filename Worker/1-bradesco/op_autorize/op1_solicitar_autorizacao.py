@@ -128,6 +128,23 @@ def run(scraper: "BaseScraper", job_data: dict) -> list:
     qtde_solicitada = _extrair_param(job_data, "qtde_solicitad")
     caminho_arquivo_rm = _extrair_param(job_data, "caminho_arquivo_RM")
 
+    if caminho_arquivo_rm and (caminho_arquivo_rm.startswith("http://") or caminho_arquivo_rm.startswith("https://")):
+        import tempfile
+        import requests as req_lib
+        scraper.log(f"Baixando anexo RM de URL: {caminho_arquivo_rm}", job_id=job_id)
+        try:
+            r = req_lib.get(caminho_arquivo_rm, timeout=60)
+            r.raise_for_status()
+            ext = os.path.splitext(caminho_arquivo_rm.split("?")[0])[-1] or ".pdf"
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext, prefix="rm_bradesco_")
+            tmp.write(r.content)
+            tmp.close()
+            caminho_arquivo_rm = tmp.name
+            scraper.log(f"Arquivo salvo temporariamente em: {caminho_arquivo_rm}", job_id=job_id)
+        except Exception as e_dl:
+            scraper.log(f"Erro ao baixar anexo da URL {caminho_arquivo_rm}: {e_dl}", level="ERROR", job_id=job_id)
+            raise ValueError(f"Falha ao baixar anexo do prontuário: {e_dl}")
+
     # ── Validar RegistroAns ──
     if registro_ans not in REGISTRO_ANS_OPTIONS:
         scraper.log(f"RegistroAns '{registro_ans}' não está na lista permitida: {REGISTRO_ANS_OPTIONS}", level="WARN", job_id=job_id)

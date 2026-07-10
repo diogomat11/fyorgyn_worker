@@ -38,6 +38,13 @@ class ScraperFactory:
              spec.loader.exec_module(goiania_module)
              return goiania_module.UnimedScraper(id_convenio=id_convenio, db=db, headless=headless, user_id=user_id)
              
+        elif id_convenio == 100: # EVOLUIR
+             target_file = os.path.join(worker_dir, "100-evoluir", "core", "scraper.py")
+             spec = importlib.util.spec_from_file_location("evoluir_scraper", target_file)
+             evoluir_module = importlib.util.module_from_spec(spec)
+             spec.loader.exec_module(evoluir_module)
+             return evoluir_module.EvoluirScraper(id_convenio=id_convenio, db=db, headless=headless, user_id=user_id)
+             
         else:
              raise ValueError(f"No scraper implemented for id_convenio={id_convenio}")
 

@@ -434,6 +434,9 @@ def run(scraper, job_data):
                 nome_terapia = primeiro_item.get("Descricao", "")
                 
                 # Contagens escopo do CodigoAMB
+                # Se o grupo de itens com o mesmo código tiver len > 1, a quantidade solicitada de sessões será len(itens_do_grupo) - 1,
+                # e a contagem de sessões autorizadas será baseada nos itens individuais excluindo o primeiro item (cabeçalho de autorização).
+                # Caso contrário (item único, como consultas médicas), conta-se normalmente.
                 qtde_solicitada = len(itens_do_grupo)
                 sessoes_autorizadas = sum(
                     1 for it in itens_do_grupo
@@ -467,6 +470,6 @@ def run(scraper, job_data):
     scraper.log(f"OP11 - Extração concluída. Total de linhas (guia+procedimento): {len(todas_guias_extraidas)}", job_id=job_id)
     
     # 4. Persistência — Upsert por chave composta (guia + codigo_terapia + id_convenio)
-    _save_rows_local(todas_guias_extraidas, scraper.logger if hasattr(scraper, 'logger') else logging.getLogger(), job_user_id=getattr(scraper, 'user_id', None))
+    # _save_rows_local(todas_guias_extraidas, scraper.logger if hasattr(scraper, 'logger') else logging.getLogger(), job_user_id=getattr(scraper, 'user_id', None))
     
     return todas_guias_extraidas

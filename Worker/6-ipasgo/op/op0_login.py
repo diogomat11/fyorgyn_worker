@@ -20,6 +20,8 @@ from config.constants import (
     X_LOGIN_ERROR_MESSAGE,
     DEFAULT_TIMEOUT,
     X_ALERT_CLOSE,
+    X_FACPLAN_LINK,
+    X_FACPLAN_LINK_ABS,
 )
 
 if TYPE_CHECKING:
@@ -165,11 +167,12 @@ def run(scraper: BaseScraper, job_data: dict) -> list[dict]:
     # Acesso opcional ao FACPLAN caso disponível no Dashboard
     try:
         link = find_with_frames([
-            "/html/body/form/div[3]/div/div[2]/div/div[2]/div/div/span/div[6]/div/div[2]/div[2]/div/div/div[2]/table/tbody/tr[2]/td/div/a",
+            X_FACPLAN_LINK_ABS,
+            X_FACPLAN_LINK,
+            "//a[contains(.,'Web') and contains(.,'Plan')]",
             "//a[contains(.,'Fac') and contains(.,'Plan')]",
-            "//a[contains(@href,'Portal_FAC') or contains(@href,'facplan')]",
-        ])
-        
+            "//a[contains(@href,'Portal_FAC') or contains(@href,'facplan') or contains(@href,'webplan')]",
+        ])        
         driver.execute_script("arguments[0].scrollIntoView(true);", link)
         time.sleep(1)
         

@@ -58,6 +58,7 @@ class Carteirinha(Base):
     
     is_temporary = Column(Boolean, default=False)
     expires_at = Column(DateTime(timezone=True), nullable=True)
+    cid = Column(Text, nullable=True)
 
     jobs = relationship("Job", primaryjoin="Carteirinha.id == Job.carteirinha_id", back_populates="carteirinha_rel", cascade="all, delete-orphan")
     guias = relationship("BaseGuia", back_populates="carteirinha_rel", cascade="all, delete-orphan")
@@ -74,11 +75,15 @@ class Job(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     rotina = Column(Text) # consulta_guias, autorizacao, etc.
     params = Column(JSONB, nullable=True) # Arbitrary JSON parameters
+    result_data = Column(JSONB, nullable=True) # Resposta JSON do worker
+    result_consumed = Column(Boolean, default=False) # Flag: backend já consumiu o resultado?
     status = Column(Text, nullable=False, default="pending", index=True) # success, pending, processing, error
     attempts = Column(Integer, default=0)
+    max_attempts = Column(Integer, default=3)
     priority = Column(Integer, default=0)
     depending_id = Column(Integer, ForeignKey("worker.jobs.id", ondelete="SET NULL"), nullable=True)
     locked_by = Column(Text) # Server URL
+    error_message = Column(Text, nullable=True) # Última mensagem de erro
     timeout = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -116,6 +121,24 @@ class BaseGuia(Base):
 
     carteirinha_rel = relationship("Carteirinha", back_populates="guias")
     convenio_rel = relationship("Convenio")
+
+class RelatorioClinico(Base):
+    __tablename__ = "relatorios_clinicos"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    id_paciente = Column(Text, nullable=True)
+    nome_paciente = Column(Text, nullable=True)
+    tipo_relatorio = Column(Text, nullable=False)
+    id_relatorio = Column(Text, nullable=True)
+    url_arquivo = Column(Text, nullable=True)
+    carga = Column(Text, nullable=True)
+    tipo_carga_horaria = Column(Text, nullable=True)
+    id_area = Column(Integer, nullable=True)
+    data = Column(Date, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 class PeiTemp(Base):
     __tablename__ = "pei_temp"
@@ -378,16 +401,17 @@ class CorpoClinico(Base):
     __table_args__ = {'extend_existing': True}
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
 
-    id_profissional = Column(Integer, primary_key=True, index=True)
+    id_profissional = Column(Text, primary_key=True, index=True)
     nome = Column(Text, nullable=False)
     cpf = Column(Text)
-    area = Column(Text)
+    area = Column(Text, primary_key=True, default='')
     conselho = Column(Text)
     registro = Column(Text)
     UF = Column(Text)
     CBO = Column(Text)
     codigo_ipasgo = Column(Text)
     status = Column(Text, default="ativo")
+    tipo_profissional = Column(Text, default="profissional")
 
 class Agendamento(Base):
     __tablename__ = "agendamentos"
@@ -406,7 +430,7 @@ class Agendamento(Base):
     data = Column(Date)
     hora_inicio = Column(Time)
     sala = Column(Text)
-    Id_profissional = Column(Integer)
+    Id_profissional = Column(Text)
     Nome_profissional = Column(Text)
     Tipo_atendimento = Column(Text)
     id_procedimento = Column(Integer)
@@ -489,6 +513,7 @@ class ProtocoloLote(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    convenio = Column(Text, nullable=True, default="unimed_goiania")
     status = Column(Text, nullable=False, default="pending", index=True)  # pending, processing, completed, error
     total_arquivos = Column(Integer, default=0)
     total_processado = Column(Integer, default=0)
@@ -559,7 +584,32 @@ class RelatorioMedicoExtracao(Base):
     tipo_carga_horaria = Column(String(20))
     status_extracao = Column(String(20), nullable=False, default="NAO_EXTRAIDO", index=True)
     itens_ignorados = Column(JSON)
+    data_relatorio = Column(Date, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class RelatorioClinico(Base):
+    __tablename__ = "relatorios_clinicos"
+    __table_args__ = (
+        UniqueConstraint('id_paciente', 'id_relatorio', 'tipo_relatorio', name='uq_relatorio_clinico_pac_rel_tipo'),
+        {'extend_existing': True}
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    id_paciente = Column(Text, index=True)
+    nome_paciente = Column(Text)
+    tipo_relatorio = Column(Text, nullable=False) # 'PTS' ou 'ANEXO-II'
+    id_relatorio = Column(Text)
+    url_arquivo = Column(Text)
+    carga = Column(Text)
+    tipo_carga_horaria = Column(Text)
+    id_area = Column(Integer)
+    data = Column(Date)
+    nome_profissional = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
 
