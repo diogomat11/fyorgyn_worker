@@ -3,6 +3,6 @@
     "login": "REC2209525",
     "password": "Unimed@2025",
     "token": "webscraping_api_token_2025",
-    "headless": false,
+    "headless": true,
     "autostart": false
 }

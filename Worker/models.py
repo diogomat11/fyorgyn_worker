@@ -70,9 +70,9 @@ class Job(Base):
     __table_args__ = {'schema': 'worker', 'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
-    carteirinha_id = Column(Integer, nullable=True)
-    id_convenio = Column(Integer, nullable=True)
-    user_id = Column(Integer, nullable=True, index=True)
+    carteirinha_id = Column(Integer, ForeignKey("carteirinhas.id", ondelete="CASCADE"), nullable=True)
+    id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="SET NULL"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     rotina = Column(Text) # consulta_guias, autorizacao, etc.
     params = Column(JSONB, nullable=True) # Arbitrary JSON parameters
     result_data = Column(JSONB, nullable=True) # Resposta JSON do worker
@@ -88,6 +88,8 @@ class Job(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+    carteirinha_rel = relationship("Carteirinha", primaryjoin="Job.carteirinha_id == Carteirinha.id", back_populates="jobs")
+    convenio_rel = relationship("Convenio")
     logs = relationship("Log", back_populates="job_rel", cascade="all, delete-orphan")
 
 class BaseGuia(Base):
@@ -175,13 +177,14 @@ class Log(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     job_id = Column(Integer, ForeignKey("worker.jobs.id", ondelete="SET NULL"), nullable=True)
-    carteirinha_id = Column(Integer, nullable=True)
-    user_id = Column(Integer, nullable=True, index=True)
+    carteirinha_id = Column(Integer, ForeignKey("carteirinhas.id", ondelete="SET NULL"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     level = Column(Text, default="INFO") # INFO, WARN, ERROR
     message = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     job_rel = relationship("Job", back_populates="logs")
+    carteirinha_rel = relationship("Carteirinha", primaryjoin="Log.carteirinha_id == Carteirinha.id", back_populates="logs")
 
 
 class Worker(Base):
