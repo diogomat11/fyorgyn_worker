@@ -19,22 +19,24 @@
   * **Caso Fallback (Pronto):** Se o status não for mais `"Criando lote"` ou `"Carregando lote"` e a data final do lote bater com o parâmetro enviado, o bot também assume a conclusão e captura o ID.
   * **Caso Processando:** Se os status indicarem fila de criação, o bot prossegue para o auto-agendamento.
 
-### 2.3 Conclusão do Lote (Lote Pronto)
+### 2.3 Conclusão do Lote (Lote Pronto - Delegado ao Backend)
 Se o ID do lote da API for obtido:
-1. **Atualização do Lote local:** Localiza o `LoteConvenio` e vincula o `numero_lote = lote_id_api` e define o status para `"Aberto"`.
-2. **Criação da OP6 (Download de Guias):** Agenda um Job de rotina `"6"` (`op6_check_baixados.py`) para varrer e associar as guias geradas ao lote correspondente no banco local.
+- O worker retorna no JSON de resultado o status `"ready"`, o `lote_id_api` e o `id_lote_interno`.
+- O Hub Backend recebe esse resultado via webhook, atualiza o `LoteConvenio` local para `"Aberto"` e cria o job `"6"` (`op6_check_baixados.py`) para baixar as faturas do lote no `backend_worker`.
 
-### 2.4 Reagendamento (Lote em Fila)
+### 2.4 Reagendamento (Delegado ao Backend)
 Se o lote ainda não estiver pronto:
-- Cria um novo `Job` de rotina `"13_poll"` com os mesmos parâmetros e incrementa o contador `poll_attempt` para nova tentativa em 1 minuto.
+- O worker retorna o status `"processing"`.
+- O Hub Backend recebe o webhook de "processing" e agenda um novo job `"13_poll"` no `backend_worker` incrementando a tentativa de polling.
 
 ## 3. Retorno
-Retorna indicando se houve sincronia com sucesso no ciclo atual:
+Retorna o dicionário de status do polling:
 ```json
 {
-    "self_persisted": true,
-    "inserted": 0,
-    "updated": 1, // Se finalizado e atualizado localmente
-    "total": 1
+  "status": "ready" ou "processing",
+  "lote_id_api": 2026071301,
+  "id_lote_interno": 45,
+  "cod_prestador": "98271",
+  "poll_attempt": 0
 }
 ```

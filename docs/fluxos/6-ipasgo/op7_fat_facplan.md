@@ -4,7 +4,7 @@
 
 ## 1. Princípios de Design
 - **Abordagem API Direta:** Substitui a navegação intensiva por UI. Após a ancoragem do Facplan, o robô consome o método `modificar_detalhe` do `WebPlanClient` repassando o novo Status.
-- **Transação Mista:** Executa o faturamento de forma síncrona no provedor (IPASGO) e, em caso de sucesso (`HTTP 200/Validação`), atualiza imediatamente o reflexo deste status no banco local SQLite/PostgreSQL, evitando descasamento de dados.
+- **Retorno Stateless:** Executa o faturamento de forma síncrona no provedor (IPASGO) e retorna os resultados de sucesso e falha no payload de retorno do Job, delegando qualquer persistência no banco de dados para o webhook do Hub Backend.
 
 ## 2. Passo a Passo Funcional
 
@@ -24,15 +24,10 @@
 - Inicializa a classe `WebPlanClient(driver)` para absorver os cookies estabilizados.
 - Aciona `client.modificar_detalhe(...)` injetando o payload final para a FacilInformatica. Esta requisição sela as modificações ou faturamento na conta do lado do Ipasgo.
 
-### 2.4 Persistência e Sincronização Local
-- Uma vez validada a etapa de rede, a rotina faz o `Update` no Banco de Dados.
-- Tenta recuperar da tabela `FaturamentoLote` o registro que bata exatamente com o `detalheId`.
-- Caso exista:
-  - Sobrescreve a coluna `StatusConferencia` com o novo código.
-  - Formata e sobrescreve a coluna `dataRealizacao` (`dd/mm/yyyy` -> Objeto Date).
-  - Aciona `scraper.db.commit()` e informa o sucesso no Log.
-- Caso o `detalheId` seja um órfão não rastreado no banco local, emite um Log nível de `WARN`, não interrompendo a rotina pois o faturamento no IPASGO já ocorreu.
+### 2.4 Processamento de Resultados (Sem Acesso ao Banco Público)
+- O script não interage com o banco de dados do Hub. Ele executa as chamadas ao FacPlan em loop para cada um dos itens informados e armazena os sucessos e falhas em memória.
+- As atualizações correspondentes de `StatusConferencia` nos faturamentos locais (`FaturamentoLote`) são delegadas ao Hub Backend, que realiza as alterações nas tabelas correspondentes ao receber o webhook de retorno.
 
 ### 2.5 Tear-Down
-- Se houver falha de banco de dados, dá `rollback()`.
-- O worker finaliza retornando array vazio `[]` garantindo que o status do Job transacione para Concluído.
+- Ao final, a rotina retorna um dicionário detalhado contendo a contagem total de sucessos e falhas, os identificadores de itens bem-sucedidos (`itens_sucesso`) e a lista detalhada de falhas com os erros específicos (`itens_erro`).
+- O dispatcher recebe esse dicionário de resultados e o envia no webhook para que o backend persista os status no banco de dados público.

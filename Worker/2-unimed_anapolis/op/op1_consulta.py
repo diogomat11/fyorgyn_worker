@@ -49,7 +49,7 @@ def execute(scraper, job_data):
     Lógica copiada e adaptada de Unimed Goiânia (ImportBaseGuias.py).
     """
     job_id = job_data.get("job_id")
-    carteirinha = job_data.get("carteirinha")
+    carteirinha = job_data.get("carteirinha") or job_data.get("Carteira") or job_data.get("carteira")
     carteirinha_db_id = job_data.get("carteirinha_id") # if available
     
     scraper.log(f"Op1: Processing carteirinha {carteirinha}", job_id=job_id, carteirinha_id=carteirinha_db_id)

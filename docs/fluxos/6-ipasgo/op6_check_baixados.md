@@ -24,12 +24,9 @@
 ### 2.3 Varredura Restante (Looping)
 - Baseado em `total_pages > 1`, o script itera da `Página 1` até a última página extraindo e anexando todos os registros na lista em memória (`all_items`).
 
-### 2.4 Persistência de Dados (Upsert)
-- O script realiza uma iteração unitária (`for item in all_items`) sobre os registros para atualizar o banco de dados via SQLAlchemy (`scraper.db`).
-- **Lógica de Match:** Busca na tabela `FaturamentoLote` se o registro já existe pela chave `detalheId`.
-- **Update (Se existir):** Atualiza as chaves: `DataRealizacao`, `Guia`, `StatusConferencia`, `ValorProcedimento`, `CodigoBeneficiario` e `loteId`.
-- **Insert (Se novo):** Insere um novo objeto de `FaturamentoLote` na base de dados.
-- Realiza um `.commit()` massivo para garantir transação atômica. Se houver falha de integridade, executa `.rollback()` e levanta erro crítico.
+### 2.4 Processamento de Resultados (Sem Acesso ao Banco Público)
+- O script apenas acumula todos os registros extraídos em uma lista em memória (`all_items`) de forma 100% stateless, sem realizar interações diretas com as tabelas de faturamento no banco de dados local.
+- As atualizações de status, gravações de lotes e acionamentos de conciliação são delegados ao Hub Backend, que executa essa lógica ao processar o webhook de retorno.
 
 ### 2.5 Tear-Down
-- A operação retorna uma lista vazia `[]` em sucesso, pois a sua obrigação era popular/sincronizar o banco de dados diretamente sem necessidade de devolução para o dispatcher processar tabelas paralelas.
+- A operação retorna a lista completa de itens extraídos (`all_items`) no JSON de resultados, que é enviado pelo dispatcher para o webhook do backend.

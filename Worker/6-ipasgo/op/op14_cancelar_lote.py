@@ -76,27 +76,4 @@ def run(scraper, job_data):
     
     scraper.log(f"OP14 - Resposta de cancelamento: {response_data}", job_id=job_id)
     
-    # Atualiza o banco local
-    try:
-        from models import LoteConvenio, FaturamentoLote
-        if id_lote_interno:
-            lote_obj = scraper.db.query(LoteConvenio).filter_by(id_lote=id_lote_interno).first()
-            if lote_obj:
-                lote_obj.status = "Cancelado"
-        else:
-            lote_obj = scraper.db.query(LoteConvenio).filter_by(numero_lote=numero_lote).first()
-            if lote_obj:
-                lote_obj.status = "Cancelado"
-
-        # Garante que todos os itens deste lote fiquem marcados como bloqueados/cancelados
-        items = scraper.db.query(FaturamentoLote).filter_by(id_lote=lote_obj.id_lote).all() if lote_obj else []
-        for item in items:
-            item.StatusConciliacao = "bloqueado"
-
-        scraper.db.commit()
-        scraper.log(f"Banco local atualizado com sucesso. Lote {numero_lote} cancelado.", job_id=job_id)
-    except Exception as e:
-        scraper.db.rollback()
-        scraper.log(f"Falha ao atualizar status de cancelamento local: {e}", level="ERROR", job_id=job_id)
-
     return [{"numero_lote": numero_lote, "status": "Cancelado"}]

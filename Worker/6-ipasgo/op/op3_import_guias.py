@@ -214,65 +214,7 @@ def _formatar_ddmmyyyy(s):
             return str(s).strip()
 
 def _save_rows_local(rows, logger, job_user_id=None):
-    try:
-        from database import SessionLocal
-        from models import BaseGuia, Carteirinha
-        db_session = SessionLocal()
-        try:
-            for row_data in rows:
-                guia_record = db_session.query(BaseGuia).filter(
-                    BaseGuia.guia == str(row_data["guia"]),
-                    BaseGuia.id_convenio == 6
-                ).first()
-                if not guia_record:
-                    guia_record = BaseGuia(guia=str(row_data["guia"]), user_id=job_user_id)
-                    db_session.add(guia_record)
-                else:
-                    if guia_record.user_id is None:
-                        guia_record.user_id = job_user_id
-                    elif guia_record.user_id != job_user_id:
-                        continue
-                
-                guia_record.senha = row_data["senha"]
-                guia_record.status_guia = row_data["status_guia"]
-                guia_record.codigo_terapia = row_data["codigo_terapia"]
-                try:
-                    guia_record.qtde_solicitada = int(str(row_data["qtde_solicitada"]).strip()) if row_data["qtde_solicitada"] and str(row_data["qtde_solicitada"]).strip() else 0
-                    guia_record.sessoes_autorizadas = int(str(row_data["sessoes_autorizadas"]).strip()) if row_data["sessoes_autorizadas"] and str(row_data["sessoes_autorizadas"]).strip() else 0
-                except ValueError:
-                    pass
-                    
-                if row_data.get("data_autorizacao"):
-                    try:
-                        dt_str = str(row_data["data_autorizacao"])[:10]
-                        guia_record.data_autorizacao = datetime.strptime(dt_str, "%Y-%m-%d").date()
-                    except ValueError:
-                        pass
-                if row_data.get("validade"):
-                    try:
-                        dt_str = str(row_data["validade"])[:10]
-                        guia_record.validade = datetime.strptime(dt_str, "%Y-%m-%d").date()
-                    except ValueError:
-                        pass
-                
-                guia_record.id_convenio = 6 # IPASGO
-                if row_data.get("codigo_beneficiario"):
-                    guia_record.codigo_beneficiario = row_data["codigo_beneficiario"]
-                    cart = db_session.query(Carteirinha).filter(
-                        Carteirinha.codigo_beneficiario == row_data["codigo_beneficiario"],
-                        Carteirinha.user_id == job_user_id
-                    ).first()
-                    if cart:
-                        guia_record.carteirinha_id = cart.id
-
-            db_session.commit()
-            if logger:
-                logger.info(f"Salvos {len(rows)} registros em base_guias locais (Worker DB)")
-        finally:
-            db_session.close()
-    except Exception as db_err:
-        if logger:
-            logger.error(f"Erro ao salvar base_guias locais: {db_err}")
+    pass
 
 def run(scraper: 'BaseScraper', job_data: dict) -> list[dict]:
     driver = scraper.driver

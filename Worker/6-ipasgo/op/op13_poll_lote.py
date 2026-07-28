@@ -115,84 +115,21 @@ def run(scraper, job_data):
     else:
         scraper.log(f"OP13_poll - Resposta inesperada do LoadLotes: {type(lotes_data)}", level="WARN", job_id=job_id)
     
-    # 3. Se encontrou o lote, finalizar
+    # 3. Retornar status do lote encontrado ou processando
     if lote_id_api:
-        # 3a. Atualizar LoteConvenio no banco
-        if id_lote_interno:
-            try:
-                from models import LoteConvenio
-                lote_obj = scraper.db.query(LoteConvenio).filter_by(id_lote=id_lote_interno).first()
-                if lote_obj:
-                    lote_obj.numero_lote = lote_id_api
-                    lote_obj.status = "Aberto"
-                    scraper.db.commit()
-                    scraper.log(f"OP13_poll - Banco atualizado. Lote {id_lote_interno} -> numero_lote={lote_id_api}", job_id=job_id)
-            except Exception as e:
-                scraper.db.rollback()
-                scraper.log(f"Falha ao atualizar LoteConvenio: {e}", level="ERROR", job_id=job_id)
-        
-        # 3b. Criar Job OP6 para baixar itens do lote
-        try:
-            from models import Job, LoteConvenio
-            convenio_id = 6
-            if id_lote_interno:
-                lote_obj = scraper.db.query(LoteConvenio).filter_by(id_lote=id_lote_interno).first()
-                if lote_obj:
-                    convenio_id = lote_obj.id_convenio
-
-            op6_params = {
-                "codigoPrestador": cod_prestador,
-                "numero_lote": lote_id_api,
-                "id_lote_interno": id_lote_interno
-            }
-            
-            new_job = Job(
-                id_convenio=convenio_id,
-                rotina="6",
-                params=json.dumps(op6_params),
-                status="pending",
-                priority=10,
-                user_id=getattr(scraper, 'user_id', None)
-            )
-            scraper.db.add(new_job)
-            scraper.db.commit()
-            scraper.log(f"OP13_poll - Job OP6 criado para Lote {lote_id_api}!", job_id=job_id)
-        except Exception as e:
-            scraper.db.rollback()
-            scraper.log(f"Falha ao criar Job OP6: {e}", level="ERROR", job_id=job_id)
-        
-        return {"self_persisted": True, "inserted": 0, "updated": 1, "total": 1}
-    
-    # 4. Lote ainda não pronto -> criar outro Job OP13_poll (sem limite de tentativas)
-    try:
-        from models import Job, LoteConvenio
-        convenio_id = 6
-        if id_lote_interno:
-            lote_obj = scraper.db.query(LoteConvenio).filter_by(id_lote=id_lote_interno).first()
-            if lote_obj:
-                convenio_id = lote_obj.id_convenio
-
-        poll_params = {
-            "cod_prestador": cod_prestador,
-            "data_fim": data_fim,
-            "data_fim_iso": data_fim_iso,
+        scraper.log(f"OP13_poll - Lote pronto! ID: {lote_id_api}", job_id=job_id)
+        return {
+            "status": "ready",
+            "lote_id_api": lote_id_api,
             "id_lote_interno": id_lote_interno,
-            "poll_attempt": poll_attempt + 1
+            "cod_prestador": cod_prestador
         }
-        
-        new_job = Job(
-            id_convenio=convenio_id,
-            rotina="13_poll",
-            params=json.dumps(poll_params),
-            status="pending",
-            priority=15,
-            user_id=getattr(scraper, 'user_id', None)
-        )
-        scraper.db.add(new_job)
-        scraper.db.commit()
-        scraper.log(f"OP13_poll - Lote não pronto (status: {status_atual}). Próximo poll #{poll_attempt + 2} agendado.", job_id=job_id)
-    except Exception as e:
-        scraper.db.rollback()
-        scraper.log(f"Falha ao criar próximo Job OP13_poll: {e}", level="ERROR", job_id=job_id)
-
-    return {"self_persisted": True, "inserted": 0, "updated": 0, "total": 0}
+    
+    scraper.log(f"OP13_poll - Lote ainda processando (status atual: {status_atual})", job_id=job_id)
+    return {
+        "status": "processing",
+        "lote_id_api": None,
+        "id_lote_interno": id_lote_interno,
+        "cod_prestador": cod_prestador,
+        "poll_attempt": poll_attempt
+    }

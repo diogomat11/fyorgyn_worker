@@ -32,7 +32,7 @@ if sys.stderr is None: sys.stderr = FileLogStream("dispatcher_err.log")
 
 # Use local Worker modules (independent of backend)
 from database import SessionLocal
-from models import Job, BaseGuia, Log, Carteirinha, PriorityRule
+from models import Job, Log, PriorityRule
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -189,31 +189,13 @@ def retry_failed_jobs(db):
 
 
 def cleanup_expired_captures(db):
-    try:
-        from datetime import datetime, timedelta, timezone
-        from models import BaseGuia, Convenio
-        
-        # 59 minutes timeout threshold
-        limit_time = datetime.now(timezone.utc) - timedelta(minutes=59)
-        
-        expired_guias = db.query(BaseGuia).join(
-            Convenio, BaseGuia.id_convenio == Convenio.id_convenio
-        ).filter(
-            Convenio.timeout_captura == True,
-            BaseGuia.timestamp_captura != None,
-            BaseGuia.timestamp_captura < limit_time
-        ).all()
-        
-        count = 0
-        for guia in expired_guias:
-            guia.timestamp_captura = None
-            count += 1
-            
-        if count > 0:
-            db.commit()
-            logger.info(f"Swept {count} guias exceeding the 59m timeout flag.")
-    except Exception as e:
-        logger.error(f"Error sweeping expired captures: {e}")
+    """
+    REMOVIDO: O worker não acessa o schema public (base_guias / convenios).
+    A limpeza de capturas expiradas (timeout de 59min) é responsabilidade do
+    Hub Backend, que recebe o timestamp_captura via webhook e gerencia a
+    expiração em sua própria base de dados.
+    """
+    pass
 
 def recover_stuck_jobs(db):
     try:
@@ -502,7 +484,10 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                         db.commit()
                         
                         try:
-                            webhook_url = f"{BACKEND_API_URL}/jobs/{job_id}/result"
+                            base_api = str(BACKEND_API_URL).rstrip('/')
+                            if base_api.endswith('/api'):
+                                base_api = base_api[:-4]
+                            webhook_url = f"{base_api}/api/jobs/{job_id}/result"
                             logger.info(f"Sending webhook to {webhook_url}")
                             webhook_resp = requests.post(webhook_url, json=data, timeout=30)
                             if webhook_resp.status_code == 200:
@@ -781,10 +766,25 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                     server_status_map[server_url]["last_login"] = get_job_login(db, locked_job)
                     dispatched_servers.add(server_url)
                     
-                    # Spawn thread to call worker server
+                    # Extrai o número da carteirinha de params (worker é 100% stateless)
+                    params_dict = locked_job.params or {}
+                    if isinstance(params_dict, str):
+                        try:
+                            import json as _json
+                            params_dict = _json.loads(params_dict)
+                        except:
+                            params_dict = {}
+                    _carteirinha_str = (
+                        params_dict.get("carteirinha") or 
+                        params_dict.get("Carteirinha") or 
+                        params_dict.get("carteira") or 
+                        params_dict.get("Carteira") or 
+                        params_dict.get("codigo_beneficiario") or
+                        ""
+                    )
                     t = threading.Thread(
                         target=call_server,
-                        args=(server_url, locked_job.id, locked_job.carteirinha_rel.carteirinha if locked_job.carteirinha_rel else "",
+                        args=(server_url, locked_job.id, _carteirinha_str,
                               locked_job.carteirinha_id, locked_job.id_convenio,
                               locked_job.rotina, locked_job.params, server_status_map, locked_job.user_id)
                     )

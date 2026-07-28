@@ -62,7 +62,10 @@ def run(scraper: BaseScraper, job_data: dict) -> list:
         driver.get(url_base)
         
         # Aguarda a página carregar
-        aguardar_elemento(driver, By.ID, "buscarGuias", timeout=20)
+        try:
+            aguardar_elemento(driver, By.ID, "buscarGuias", timeout=15)
+        except Exception:
+            scraper.log("Elemento 'buscarGuias' não encontrado (timeout). Prosseguindo com fetch JS mesmo assim.", level="WARN", job_id=job_id)
         time.sleep(2)
         
         # ── Fechar popups e modais que possam atrapalhar ──

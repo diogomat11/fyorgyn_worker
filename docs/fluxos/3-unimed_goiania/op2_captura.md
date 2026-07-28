@@ -14,7 +14,7 @@
    - Avalia a regra vitalícia limitante de **59 minutos**. Se a vida contábil online transcorrida deste horário extraído for maior ou igual ao Limite e somada uma folga paralela (2 minutos de segurança para travas de comunicação Web HTTP).
    - O Sistema determina a Guia como `"Expirada localmente!"`. 
    - Clica sobre imagem Vector do "Excluir" (lixeira vermelha) disposta ao final daquela linha HTML e destrói o registro da tabela SGUCard na nuvem.
-   - Força falha parcial do retorno da Função (sinalizando para recapturar/regravar na fase seguinte).
+   - Força falha parcial do retorno da Função (sinalizando para recapturar/regravar na fase seguinte). Se não expirou, extrai o `timestamp_captura` e o retorna no resultado do job para ser enviado ao webhook.
 
 ## 3. Fase de Re-Captura Biométrica (Recomeço / Start Up)
 Caso o Pré-Filtro tenha resultado estéril ou tenha sido abortado pelo Expirador Temporal acima citado:
@@ -30,8 +30,8 @@ Caso o Pré-Filtro tenha resultado estéril ou tenha sido abortado pelo Expirado
    - Se apareceu o QR/Scan, o robô entra num estado de Timeout Limite de até **3 minutos** aguardando a realização do reconhecimento fácil. A tela desaparecerá sozinha do SGUCard.
    - Se estourar 3 minutos com a tela de biometria engasgada na frente, ele encerra a popup e segue pra checar falha.
 
-## 4. Fase de Pós-Filtro de Reingresso
+## 4. Fase de Pós-Filtro de Reingresso e Retorno
 1. Com a popup fechada, o Scraper foca na listagem Global de Aberto original e submete a guia isoladamente no Input Search.
 2. **Verdade de Captura Final:**
-   - Se o portal retornar a aba de registro: Capta o Timestamp Server-Side de posse da guida. Transmite sucesso pro DB Hub. Encerrando rotina.
-   - **Caso Inválido:** Se a listagem retornar vazia (o pós-filtro não achar), atesta-se matematicamente falha na fase 3: Seja via recusa de Biometria vencida nos 3 Minutos, ou problemas no próprio `Confirmar`. O Workflow registra via log restrito `"guia não capturada ou biometria não realizada"` e lança exception de barramento para parar fila.
+   - Se o portal retornar a aba de registro: Capta o Timestamp Server-Side de posse da guia e retorna esse timestamp no resultado do job. A persistência no banco de dados público (tabela `BaseGuia`) é feita pelo Hub Backend após receber o webhook de retorno.
+   - **Caso Inválido:** Se a listagem retornar vazia (o pós-filtro não achar), atesta-se matematicamente falha na fase 3. O workflow registra via log `"guia não capturada ou biometria não realizada"` e lança exception de barramento para parar o job.

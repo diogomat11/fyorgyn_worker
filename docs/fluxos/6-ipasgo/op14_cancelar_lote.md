@@ -16,16 +16,17 @@
 - O script invoca o client `WebPlanClient` e executa a chamada `cancelar_lote` passando o número do lote e código do prestador.
 - A API do Ipasgo recebe o comando e realiza a desestruturação do lote no servidor deles.
 
-### 2.3 Atualização no Banco Local
-- **LoteConvenio:** Localiza a entidade local e atualiza o status para `"Cancelado"`.
-- **FaturamentoLote:** Busca todas as guias associadas a esse lote e define a coluna `StatusConciliacao = "bloqueado"` para cada uma.
-- Realiza o commit no banco de dados local.
+### 2.3 Processamento de Resultados (Sem Acesso ao Banco Público)
+- O script não interage com o banco de dados do Hub. Ele apenas efetua a chamada de cancelamento no portal e retorna o resultado da operação.
+- A lógica de atualizar o `LoteConvenio` local para `"Cancelado"` e atualizar o `StatusConciliacao` das guias para `"bloqueado"` é delegada ao Hub Backend ao receber o webhook de retorno.
 
 ## 3. Retorno
-Retorna o número do lote cancelado e o novo status:
+Retorna indicando o sucesso do cancelamento e os metadados do lote:
 ```json
-[{
-    "numero_lote": "88776655",
-    "status": "Cancelado"
-}]
+{
+  "status": "success",
+  "message": "Lote cancelado com sucesso no portal.",
+  "numero_lote": "88776655",
+  "id_lote_interno": 45
+}
 ```

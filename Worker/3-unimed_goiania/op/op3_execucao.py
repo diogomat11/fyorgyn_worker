@@ -144,55 +144,28 @@ def execute(scraper, job_data):
         f"Op3 Execução Goiania: Guia={numero_guia} | Profissional='{nome_profissional}' "
         f"| Conselho='{conselho}' | DataHora='{data_hora}' | CodFat='{cod_proc_fat}'"
     )
-
-    # ── FASE 0: VERIFICAÇÃO DE TIMEOUT NO BANCO (Regra Goiania) ───────────────
-    db = getattr(scraper, "db", None)
-    if not db:
-        log("Conexão ao DB indisponível no Worker. Verificação de timeout ignorada.", level="WARN")
-    else:
-        from models import BaseGuia, Job
-        guia_record = db.query(BaseGuia).filter(BaseGuia.guia == numero_guia).first()
-        if not guia_record or not getattr(guia_record, "timestamp_captura", None):
-            log("Guia não possui timestamp de captura válido na base.", level="ERROR")
-            raise ValueError("Guia expirada ou não capturada previamente.")
-            
-        ts_captura = getattr(guia_record, "timestamp_captura")
-        agora = datetime.utcnow() # Assume UTC, if db uses local time adjust as needed
-        if ts_captura.tzinfo is None:
-            # Assuming DB time is local for this legacy system based on existing op3 script
-            agora = datetime.now()
-
-        limite = ts_captura + timedelta(minutes=59)
-        if limite < (agora + timedelta(minutes=2)):
-            log(f"Timeout baterá na porta! Timestamp: {ts_captura}. Faltam menos de 2m para Expirar. Cancelando execução nativa e re-disparando Captura...", level="WARN")
-            backend_url = os.environ.get("BACKEND_API_URL", "http://127.0.0.1:8000")
-            
-            guia_record.timestamp_captura = None
-            db.commit()
-            
-            if agendamento_id:
+    # ── FASE 0: VERIFICAÇÃO DE TIMEOUT (Regra Goiania via Parâmetros) ───────────
+    ts_captura_str = job_data.get("timestamp_captura")
+    if ts_captura_str:
+        try:
+            from datetime import datetime
+            ts_captura = None
+            for fmt in ["%d/%m/%Y %H:%M", "%d/%m/%Y %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S.%fZ"]:
                 try:
-                    resp = requests.post(f"{backend_url}/agendamentos/capturar", json={"agendamento_id": agendamento_id})
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        new_job_id = data.get("job_id")
-                        current_job = db.query(Job).filter(Job.id == job_id).first()
-                        if current_job:
-                            current_job.depending_id = new_job_id
-                            current_job.status = "pending"
-                            current_job.attempts = 0
-                            current_job.locked_by = None
-                            db.commit()
-                            log(f"Execução suspensa com sucesso. Dependência amarrada ao novo Job Captura {new_job_id}")
-                            raise NotImplementedError("Execução Adiada. Timeout iminente.") 
-                except Exception as e:
-                    if isinstance(e, NotImplementedError): raise e
-                    log(f"Erro ao retro-disparar a Captura via API Backend: {e}", level="ERROR")
-                    raise Exception("Falha na re-orquestração do Job por Timeout")
-            else:
-                 raise Exception("Agendamento ID ausente no Job para re-roteamento automático.")
-
-
+                    ts_captura = datetime.strptime(ts_captura_str, fmt)
+                    break
+                except ValueError:
+                    continue
+            if ts_captura:
+                agora = datetime.now()
+                limite = ts_captura + timedelta(minutes=59)
+                if limite < (agora + timedelta(minutes=2)):
+                    log(f"Timeout iminente detectado no parâmetro do Job! Timestamp de captura: {ts_captura_str}. Cancelando execução para recaptura.", level="WARN")
+                    raise ValueError("PermanentError: Guia expirada. Necessita recaptura.")
+        except Exception as e:
+            if "PermanentError" in str(e):
+                raise e
+            log(f"Falha ao validar timeout do timestamp '{ts_captura_str}': {e}", level="WARN")
     # ── FASE 1: Navegação até SADTs em Aberto ─────────────────────────────────
     log("FASE 1: Navegando até SADTs em aberto...")
     try:
@@ -407,17 +380,7 @@ def execute(scraper, job_data):
             pass
 
         msg_erro = "PermanentError: Profissional não cadastrado."
-        if db and job_id and job_id != 9999:
-            try:
-                from models import Job
-                job_obj = db.query(Job).filter(Job.id == job_id).first()
-                if job_obj:
-                    job_obj.attempts = 3
-                    job_obj.status = "error"
-                    db.commit()
-                    log(f"Job {job_id} encerrado (3 tentativas) - Profissional não cadastrado.")
-            except:
-                pass
+        pass
         raise Exception(msg_erro)
 
     time.sleep(2)
@@ -543,22 +506,7 @@ def execute(scraper, job_data):
     log("FASE 7 concluída.")
 
 
-    # ── Atualizar execucao_status no banco ────────────────────────────────────
-    if agendamento_id:
-        if db:
-            try:
-                from models import Agendamento
-                agenda = db.query(Agendamento).filter(
-                    Agendamento.id_agendamento == int(agendamento_id)
-                ).first()
-                if agenda:
-                    agenda.execucao_status = "sucesso"
-                    db.commit()
-                    log(f"Agendamento {agendamento_id} execucao_status → 'sucesso'")
-                else:
-                    log(f"Agendamento {agendamento_id} não encontrado no banco.", level="WARN")
-            except Exception as db_err:
-                log(f"Erro ao atualizar execucao_status: {db_err}", level="ERROR")
+    pass
 
     log(f"Op3 Execução concluída com sucesso! Guia={numero_guia}")
     return [{

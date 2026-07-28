@@ -173,37 +173,7 @@ def _apply_guia_filter(scraper, numero_guia, job_id):
 
 
 def _save_timestamp_captura(scraper, numero_guia, timestamp_str, job_id):
-    """Persiste timestamp_captura na tabela base_guias."""
-    try:
-        from database import SessionLocal
-        from models import BaseGuia
-        db_session = SessionLocal()
-        try:
-            guia_record = db_session.query(BaseGuia).filter(
-                BaseGuia.guia == str(numero_guia)
-            ).first()
-
-            if guia_record:
-                ts = None
-                if timestamp_str:
-                    for fmt in ["%d/%m/%Y %H:%M", "%d/%m/%Y %H:%M:%S", "%Y-%m-%d %H:%M"]:
-                        try:
-                            ts = datetime.strptime(timestamp_str, fmt)
-                            break
-                        except ValueError:
-                            continue
-                if not ts:
-                    ts = datetime.now()
-
-                guia_record.timestamp_captura = ts
-                db_session.commit()
-                scraper.log(f"timestamp_captura salvo para guia {numero_guia}: {ts}", job_id=job_id)
-            else:
-                scraper.log(f"Registro base_guias não encontrado para guia {numero_guia}.", level="WARN", job_id=job_id)
-        finally:
-            db_session.close()
-    except Exception as db_err:
-        scraper.log(f"Erro ao salvar timestamp_captura: {db_err}", level="ERROR", job_id=job_id)
+    pass
 
 
 def funccarteira(carteirinha):

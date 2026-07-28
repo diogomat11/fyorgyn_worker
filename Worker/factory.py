@@ -44,6 +44,13 @@ class ScraperFactory:
              evoluir_module = importlib.util.module_from_spec(spec)
              spec.loader.exec_module(evoluir_module)
              return evoluir_module.EvoluirScraper(id_convenio=id_convenio, db=db, headless=headless, user_id=user_id)
+
+        elif id_convenio == 101: # ABA_CLMF
+             target_file = os.path.join(worker_dir, "101-aba_clmf", "core", "scraper.py")
+             spec = importlib.util.spec_from_file_location("aba_clmf_scraper", target_file)
+             aba_module = importlib.util.module_from_spec(spec)
+             spec.loader.exec_module(aba_module)
+             return aba_module.AbaClmfScraper(id_convenio=id_convenio, db=db, headless=headless, user_id=user_id)
              
         else:
              raise ValueError(f"No scraper implemented for id_convenio={id_convenio}")

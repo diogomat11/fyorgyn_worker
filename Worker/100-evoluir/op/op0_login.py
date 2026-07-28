@@ -105,3 +105,5 @@ def run(scraper, job_data):
         scraper.log(f"Erro/Timeout ao capturar dashboardAuthHeader: {e}", level="ERROR", job_id=job_id)
         
     return {"status": "success", "message": "Logado na Evoluir e sessão exportada."}
+
+execute = run

@@ -410,20 +410,7 @@ def execute(scraper, job_data):
         # Erro permanente para parar tentativas
         msg_erro = "PermanentError: Profissional não cadastrado."
         
-        # Se tiver acesso ao DB, marca 3 tentativas
-        db = getattr(scraper, "db", None)
-        job_id = job_data.get("job_id")
-        if db and job_id and job_id != 9999:
-            try:
-                from models import Job
-                job_obj = db.query(Job).filter(Job.id == job_id).first()
-                if job_obj:
-                    job_obj.attempts = 3
-                    job_obj.status = "error"
-                    db.commit()
-                    log(f"Job {job_id} encerrado (3 tentativas) - Profissional não cadastrado.")
-            except:
-                pass
+        pass
 
         raise Exception(msg_erro)
 
@@ -560,26 +547,7 @@ def execute(scraper, job_data):
     time.sleep(2)
     log("FASE 7 concluída.")
 
-    # ── Atualizar execucao_status no banco ────────────────────────────────────
-    if agendamento_id:
-        try:
-            from database import SessionLocal
-            from models import Agendamento
-            db_session = SessionLocal()
-            try:
-                agenda = db_session.query(Agendamento).filter(
-                    Agendamento.id_agendamento == int(agendamento_id)
-                ).first()
-                if agenda:
-                    agenda.execucao_status = "sucesso"
-                    db_session.commit()
-                    log(f"Agendamento {agendamento_id} execucao_status → 'sucesso'")
-                else:
-                    log(f"Agendamento {agendamento_id} não encontrado no banco.", level="WARN")
-            finally:
-                db_session.close()
-        except Exception as db_err:
-            log(f"Erro ao atualizar execucao_status: {db_err}", level="ERROR")
+    pass
 
     log(f"Op3 Execução concluída com sucesso! Guia={numero_guia}")
     return [{

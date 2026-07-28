@@ -119,7 +119,6 @@ def run(scraper, job_data):
     sucesso_count = 0
     erro_count = 0
     failed_items = []
-    from models import FaturamentoLote
     from datetime import datetime
 
     # 2. Executa requisições em loop
@@ -141,35 +140,10 @@ def run(scraper, job_data):
                 data_realizacao=data_realizacao,
                 valor_procedimento=valor_procedimento
             )
-            
-            # Atualiza o banco de dados
-            existing = scraper.db.query(FaturamentoLote).filter_by(detalheId=detalhe_id).first()
-            if existing:
-                existing.StatusConferencia = status
-                if getattr(existing, 'user_id', None) is None:
-                    existing.user_id = getattr(scraper, 'user_id', None)
-                if data_realizacao:
-                    existing.dataRealizacao = datetime.strptime(data_realizacao, "%d/%m/%Y").date()
-                scraper.db.commit()
-            
             sucesso_count += 1
-            
-            # Atualiza contagem do Job a cada 100 itens para feedback visual
-            if index % 100 == 0 and job_id:
-                try:
-                    # Tenta atualizar items_found (depende do scraper suportar)
-                    from models import JobExecution
-                    je = scraper.db.query(JobExecution).filter_by(job_id=job_id).first()
-                    if je:
-                        je.items_found = sucesso_count
-                        scraper.db.commit()
-                except:
-                    pass
-                
             time.sleep(0.5) # Delay conservador anti-ban
             
         except Exception as e:
-            scraper.db.rollback()
             scraper.log(f"Falha no item {detalhe_id}: {e}", level="ERROR", job_id=job_id)
             erro_count += 1
             failed_items.append({
@@ -180,40 +154,12 @@ def run(scraper, job_data):
                 "erro": str(e)
             })
             
-    # Ao final atualiza contagem final
-    if job_id:
-        try:
-            from models import JobExecution
-            je = scraper.db.query(JobExecution).filter_by(job_id=job_id).first()
-            if je:
-                je.items_found = sucesso_count
-                scraper.db.commit()
-        except:
-            pass
-        
     scraper.log(f"OP7 Finalizada: {sucesso_count} sucessos, {erro_count} erros.", job_id=job_id)
     
-    if erro_count > 0:
-        # Encontrou erros. Atualizar params do Job com apenas os itens que falharam.
-        from models import Job
-        job = scraper.db.query(Job).filter(Job.id == job_id).first()
-        if job:
-            import json
-            try:
-                # Atualizar params para conter apenas os itens que falharam
-                params_dict = json.loads(job.params) if isinstance(job.params, str) else (job.params or {})
-                params_dict["itens"] = failed_items
-                job.params = params_dict
-                
-                # Impedir retentativa automática do dispatcher definindo tentativas = 3
-                job.attempts = 3
-                scraper.db.commit()
-                scraper.log(f"OP7 - Atualizou o Job #{job_id} no banco com {len(failed_items)} itens restantes com erro e tentativas=3 para evitar loop automático.", job_id=job_id)
-            except Exception as update_err:
-                scraper.db.rollback()
-                scraper.log(f"OP7 - Erro ao atualizar o Job #{job_id} com itens falhos: {update_err}", level="ERROR", job_id=job_id)
-                
-        raise RuntimeError(f"OP7 finalizada com erros: {erro_count} de {len(itens_batch)} itens falharam. Verifique os logs e reenvie.")
-        
-    return []
+    return {
+        "itens_sucesso": [item.get("detalheId") for item in itens_batch if item.get("detalheId") not in [f["detalheId"] for f in failed_items]],
+        "itens_erro": failed_items,
+        "sucesso_count": sucesso_count,
+        "erro_count": erro_count
+    }
 

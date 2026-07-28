@@ -51,6 +51,7 @@ class SeleniumManager:
         chrome_options.add_argument("--kiosk-printing")
         chrome_options.add_argument("--disable-features=PasswordLeakDetection")
         chrome_options.add_argument("--incognito")  # Impede balões nativos de "Salvar Senha" ou "Senha Vazada"
+        chrome_options.add_argument("--remote-allow-origins=*")
         
         # Desativar prompts de salvar senha do navegador
         prefs = {
@@ -59,11 +60,21 @@ class SeleniumManager:
         }
         chrome_options.add_experimental_option("prefs", prefs)
         if headless:
-            chrome_options.add_argument("--headless")
+            chrome_options.add_argument("--headless=new")
         
-        driver = webdriver.Chrome(options=chrome_options)
-        driver.maximize_window()
-        return driver
+        max_attempts = 3
+        last_err = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                driver = webdriver.Chrome(options=chrome_options)
+                driver.maximize_window()
+                return driver
+            except Exception as e:
+                last_err = e
+                print(f">>> Erro na tentativa {attempt}/{max_attempts} ao criar Chrome Driver: {e}")
+                time.sleep(1)
+        raise last_err
+
 
     def _is_alive(self, driver):
         try:

@@ -78,56 +78,12 @@ def run(scraper, job_data):
             raise Exception(f"OP13 Falhou ao Gerar Lote: {e}")
         scraper.log(f"Aviso ao chamar GerarLote: {e}. Poll job verificará.", level="WARN", job_id=job_id)
     
-    # 3. Atualizar LoteConvenio para status "Criando"
-    if id_lote_interno:
-        try:
-            from models import LoteConvenio
-            lote_obj = scraper.db.query(LoteConvenio).filter_by(id_lote=id_lote_interno).first()
-            if lote_obj:
-                lote_obj.status = "Criando"
-                scraper.db.commit()
-                scraper.log(f"OP13 - LoteConvenio {id_lote_interno} atualizado para 'Criando'", job_id=job_id)
-        except Exception as e:
-            scraper.db.rollback()
-            scraper.log(f"Falha ao atualizar LoteConvenio: {e}", level="ERROR", job_id=job_id)
-    
-    # 4. Criar Job OP13_poll para monitorar a conclusão
-    try:
-        from models import Job
-        convenio_id = 6
-        if id_lote_interno:
-            from models import LoteConvenio
-            lote_obj = scraper.db.query(LoteConvenio).filter_by(id_lote=id_lote_interno).first()
-            if lote_obj:
-                convenio_id = lote_obj.id_convenio
-
-        # Formata data_fim para ISO (01/05/2026 -> 2026-05-01)
-        parts = data_fim.split('/')
-        data_fim_iso = f"{parts[2]}-{parts[1]}-{parts[0]}" if len(parts) == 3 else data_fim
-
-        poll_params = {
-            "cod_prestador": cod_prestador,
-            "data_fim": data_fim,
-            "data_fim_iso": data_fim_iso,
-            "id_lote_interno": id_lote_interno,
-            "poll_attempt": 0
-        }
-        
-        new_job = Job(
-            id_convenio=convenio_id,
-            rotina="13_poll",
-            params=json.dumps(poll_params),
-            status="pending",
-            priority=10,
-            user_id=getattr(scraper, 'user_id', None)
-        )
-        scraper.db.add(new_job)
-        scraper.db.commit()
-        scraper.log(f"OP13 - Job OP13_poll criado. Monitoramento iniciado.", job_id=job_id)
-    except Exception as e:
-        scraper.db.rollback()
-        scraper.log(f"Falha ao criar Job OP13_poll: {e}", level="ERROR", job_id=job_id)
-
     scraper.log(f"OP13 - Requisição enviada com sucesso. Worker liberado.", job_id=job_id)
-    return {"self_persisted": True, "inserted": 0, "updated": 0, "total": 0}
+    return {
+        "status": "success",
+        "message": "GerarLote request sent successfully.",
+        "id_lote_interno": id_lote_interno,
+        "cod_prestador": cod_prestador,
+        "data_fim": data_fim
+    }
 

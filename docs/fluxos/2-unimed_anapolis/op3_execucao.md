@@ -41,8 +41,7 @@
 1. Clica de novo no Header da Guia, em `"Dados da Guia SP/SADT"`.
 2. Aguarda processar view state.
 3. Aciona ação principal do Layout: `"Finalizar Parcial"` (`Button_Parcial`).
-4. **Verificador do JS Alerta / PopUp Nativo Avançado**: 
-   - A operadora SGUCard invoca janela estática ou modal de *Confirmação Final*. 
-   - O Driver tentará ir pra Window -1. Sendo janela nativa acha-a e aciona em fim o famoso botão final com id de `'btn_confirmar'`.
-   - Se for DOM falso (Ajax modal), o scraper usa except pra se atrelar ao id DOM root `btn_confirmar` original na mesma janela que estava.
-5. Se esse clique não lançar Panic Errors na Console do WebDriver, a baixa faturação terá sua confirmação de recebimento assinada. O banco do Agenda Hub receberá na coluna `executado_status` a menção de "sucesso". Termina job.
+5. Se esse clique não lançar Panic Errors na Console do WebDriver, a baixa faturação terá sua confirmação de recebimento assinada.
+6. **Processamento de Resultados (Sem Acesso ao Banco Público):**
+   - O worker não realiza nenhuma escrita nas tabelas públicas de agendamentos (`Agendamento` ou similar). O status da execução é retornado no JSON de resultados do job como `"success"`.
+   - Ao receber o webhook de retorno com o status do processamento, o Hub Backend realiza a atualização da coluna `executado_status` para `"sucesso"` e o status do agendamento correspondente na base pública. Termina o processamento.

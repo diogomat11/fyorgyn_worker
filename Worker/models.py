@@ -19,6 +19,7 @@ class UserConvenio(Base):
     login_fat = Column(Text, nullable=True)
     senha_fat_criptografada = Column(Text, nullable=True)
     url_portal_fat = Column(Text, nullable=True)
+    worker_id_convenio = Column(Integer, nullable=True)
 
 class User(Base):
     __tablename__ = "users"
@@ -60,9 +61,10 @@ class Carteirinha(Base):
     expires_at = Column(DateTime(timezone=True), nullable=True)
     cid = Column(Text, nullable=True)
 
-    jobs = relationship("Job", primaryjoin="Carteirinha.id == Job.carteirinha_id", back_populates="carteirinha_rel", cascade="all, delete-orphan")
+    # Nota: jobs e logs estão no schema 'worker' (schema diferente). Relacionamentos ORM
+    # cross-schema não são suportados com FKs convencionais. Use queries manuais para buscar
+    # jobs/logs de uma carteirinha: session.query(Job).filter(Job.carteirinha_id == carteirinha.id)
     guias = relationship("BaseGuia", back_populates="carteirinha_rel", cascade="all, delete-orphan")
-    logs = relationship("Log", primaryjoin="Carteirinha.id == Log.carteirinha_id", back_populates="carteirinha_rel", cascade="all, delete-orphan")
     convenio_rel = relationship("Convenio")
 
 class Job(Base):
@@ -70,9 +72,9 @@ class Job(Base):
     __table_args__ = {'schema': 'worker', 'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
-    carteirinha_id = Column(Integer, ForeignKey("carteirinhas.id", ondelete="CASCADE"), nullable=True)
-    id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="SET NULL"), nullable=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    carteirinha_id = Column(Integer, nullable=True)
+    id_convenio = Column(Integer, nullable=True)
+    user_id = Column(Integer, nullable=True, index=True)
     rotina = Column(Text) # consulta_guias, autorizacao, etc.
     params = Column(JSONB, nullable=True) # Arbitrary JSON parameters
     result_data = Column(JSONB, nullable=True) # Resposta JSON do worker
@@ -88,8 +90,9 @@ class Job(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    carteirinha_rel = relationship("Carteirinha", primaryjoin="Job.carteirinha_id == Carteirinha.id", back_populates="jobs")
-    convenio_rel = relationship("Convenio")
+    # Nota: Carteirinha e Convenio estão no schema 'public' (schema diferente do worker).
+    # Relacionamentos ORM cross-schema não são suportados. Use carteirinha_id e id_convenio
+    # diretamente como inteiros para filtros e joins manuais quando necessário.
     logs = relationship("Log", back_populates="job_rel", cascade="all, delete-orphan")
 
 class BaseGuia(Base):
@@ -122,23 +125,7 @@ class BaseGuia(Base):
     carteirinha_rel = relationship("Carteirinha", back_populates="guias")
     convenio_rel = relationship("Convenio")
 
-class RelatorioClinico(Base):
-    __tablename__ = "relatorios_clinicos"
-    __table_args__ = {'extend_existing': True}
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    id_paciente = Column(Text, nullable=True)
-    nome_paciente = Column(Text, nullable=True)
-    tipo_relatorio = Column(Text, nullable=False)
-    id_relatorio = Column(Text, nullable=True)
-    url_arquivo = Column(Text, nullable=True)
-    carga = Column(Text, nullable=True)
-    tipo_carga_horaria = Column(Text, nullable=True)
-    id_area = Column(Integer, nullable=True)
-    data = Column(Date, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 class PeiTemp(Base):
     __tablename__ = "pei_temp"
@@ -177,14 +164,15 @@ class Log(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     job_id = Column(Integer, ForeignKey("worker.jobs.id", ondelete="SET NULL"), nullable=True)
-    carteirinha_id = Column(Integer, ForeignKey("carteirinhas.id", ondelete="SET NULL"), nullable=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    carteirinha_id = Column(Integer, nullable=True)
+    user_id = Column(Integer, nullable=True, index=True)
     level = Column(Text, default="INFO") # INFO, WARN, ERROR
     message = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     job_rel = relationship("Job", back_populates="logs")
-    carteirinha_rel = relationship("Carteirinha", primaryjoin="Log.carteirinha_id == Carteirinha.id", back_populates="logs")
+    # Nota: Carteirinha está no schema 'public'. Relacionamento cross-schema removido.
+    # Use carteirinha_id diretamente para filtros quando necessário.
 
 
 class Worker(Base):
@@ -251,7 +239,7 @@ class PriorityRule(Base):
     __table_args__ = {'schema': 'worker', 'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
-    id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="CASCADE"))
+    id_convenio = Column(Integer, nullable=True)
     rotina = Column(Text)
     base_priority = Column(Integer, default=2)  # Starting priority level (0 = highest)
     escalation_minutes = Column(Integer, default=10)  # Minutes per priority step-up towards 0
@@ -260,7 +248,7 @@ class PriorityRule(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    convenio_rel = relationship("Convenio")
+
 
 
 class ServerConfig(Base):
@@ -274,14 +262,14 @@ class ServerConfig(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     server_url = Column(Text, unique=True, nullable=False)  # e.g. "http://127.0.0.1:9000"
-    id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="SET NULL"), nullable=True)
+    id_convenio = Column(Integer, nullable=True)
     rotina = Column(Text, nullable=True)  # NULL = any rotina for preferred convenio
     preference_bonus = Column(Integer, default=1)  # points subtracted from effective_priority for matching jobs
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    convenio_rel = relationship("Convenio", foreign_keys=[id_convenio])
+
 
 class JobExecution(Base):
     __tablename__ = "job_executions"
@@ -289,7 +277,7 @@ class JobExecution(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     job_id = Column(Integer, ForeignKey("worker.jobs.id", ondelete="CASCADE"))
-    id_convenio = Column(Integer, ForeignKey("convenios.id_convenio", ondelete="SET NULL"), nullable=True)
+    id_convenio = Column(Integer, nullable=True)
     rotina = Column(Text)
     status = Column(Text)
     start_time = Column(DateTime(timezone=True), server_default=func.now())
@@ -303,7 +291,7 @@ class JobExecution(Base):
     meta = Column(JSONB)
 
     job_rel = relationship("Job")
-    convenio_rel = relationship("Convenio")
+
 
 class Ficha(Base):
     __tablename__ = "fichas"
@@ -611,5 +599,34 @@ class RelatorioClinico(Base):
     nome_profissional = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class WorkerConvenio(Base):
+    __tablename__ = "convenios"
+    __table_args__ = {'schema': 'worker', 'extend_existing': True}
+
+    id_convenio = Column(Integer, primary_key=True, index=True)
+    nome = Column(Text, nullable=False)
+    sigla = Column(Text, nullable=True)
+    ativo = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class WorkerConvenioOperacao(Base):
+    __tablename__ = "convenio_operacoes"
+    __table_args__ = {'schema': 'worker', 'extend_existing': True}
+
+    id = Column(Integer, primary_key=True, index=True)
+    id_convenio = Column(Integer, ForeignKey("worker.convenios.id_convenio", ondelete="CASCADE"), nullable=False)
+    rotina = Column(Text, nullable=False)
+    descricao = Column(Text, nullable=True)
+    ativo = Column(Boolean, default=True)
+    params_schema = Column(JSONB, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relacionamento interno dentro do schema worker
+    convenio_rel = relationship("WorkerConvenio", primaryjoin="WorkerConvenioOperacao.id_convenio == WorkerConvenio.id_convenio")
+
 
 

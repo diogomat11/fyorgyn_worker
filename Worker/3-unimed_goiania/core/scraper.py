@@ -87,11 +87,23 @@ class UnimedScraper(BaseScraper):
         if self.driver:
             self.driver.quit()
 
+    def _isolate_env(self):
+        import sys, os
+        _mod_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        sys.path = [p for p in sys.path if not ("Worker" in p and p != _mod_root and any(c.isdigit() for c in os.path.basename(p)))]
+        if not sys.path or sys.path[0] != _mod_root:
+            sys.path.insert(0, _mod_root)
+        for k in list(sys.modules.keys()):
+            if k.startswith("op.") or k == "op":
+                del sys.modules[k]
+
     def login(self):
+        self._isolate_env()
         from op.op0_login import execute
         execute(self, {"job_id": None})
 
     def process_job(self, rotina, job_data):
+        self._isolate_env()
         job_id = job_data.get("job_id") or job_data.get("id")
         start_time = datetime.now()
         
@@ -145,14 +157,25 @@ class UnimedScraper(BaseScraper):
             try:
                 self.log(f"Attempt {attempt+1}/{self.max_retries} for routine '{rotina}'", job_id=job_id)
                 
-                if attempt > 0:
+                # On first attempt: ensure session active. On retries: always force login.
+                if attempt == 0:
+                    session_active = False
                     try:
-                        if not self.driver or not self.driver.title:
-                            self.start_driver()
-                            self.login()
+                        if len(self.driver.window_handles) > 0 and 'sgucard' in self.driver.current_url.lower() and 'login' not in self.driver.current_url.lower():
+                            session_active = True
+                            self.log("Session already active. Skipping login.", job_id=job_id)
+                    except:
+                        pass
+                    if not session_active:
+                        self.login()
+                else:
+                    if not self.driver:
+                        self.start_driver()
+                    try:
+                        self.driver.title
                     except:
                         self.start_driver()
-                        self.login()
+                    self.login()
 
                 if not rotina: rotina = "1"
 
@@ -173,15 +196,8 @@ class UnimedScraper(BaseScraper):
                     
                 elif str(rotina).lower() in ("1", "consulta_guias", "default", "op1_consulta", "op1_consultar_guias"):
                     from op.op1_consulta import execute as op1_execute
-                    try:
-                        # Fast validation of session presence
-                        self.driver.find_element("id", "conteudo-submenu")
-                    except:
-                        self.log("Sessão ausente. Invocando OP 0 automaticamente...", level="WARN", job_id=job_id)
-                        if not self.driver: self.start_driver()
-                        self.login()
-
                     results = op1_execute(self, job_data)
+
                     
                 elif str(rotina).lower() in ("captura", "op2_captura", "2", "op2_autorizar", "autorizar"):
                     from op.op2_captura import execute as op2_execute

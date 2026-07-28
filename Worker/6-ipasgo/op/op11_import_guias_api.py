@@ -3,7 +3,6 @@ import sys
 import logging
 import re
 import time
-from sqlalchemy.dialects.postgresql import insert
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -24,14 +23,6 @@ from config.constants import (
     X_ALERT_AVISO_BANNER,
     DEFAULT_TIMEOUT,
 )
-
-try:
-    from models import Guias, GuiaIpasgo  # Replace with actual model used in worker
-except ImportError:
-    backend_path = os.path.join(os.path.dirname(os.path.dirname(_mod_root)), 'backend')
-    if backend_path not in sys.path:
-        sys.path.insert(0, backend_path)
-    # from models import ...
 
 def wait_xpath(driver, xpath, timeout=5):
     try:
@@ -181,100 +172,7 @@ def _close_notification_robust(driver, scraper=None, job_id=None):
     return False
 
 
-def _save_rows_local(rows, logger, job_user_id=None):
-    try:
-        from database import SessionLocal
-        from models import BaseGuia, Carteirinha
-        from sqlalchemy import or_
-        db_session = SessionLocal()
-        try:
-            count_inserted = 0
-            count_updated = 0
-            for row_data in rows:
-                if not row_data.get("numero_guia"):
-                    continue
-                
-                guia_num = str(row_data["numero_guia"])
-                cod_terapia = row_data.get("codigo_terapia") or ""
-                
-                # ── Busca em 2 fases para evitar duplicatas ──
-                # Fase 1: Match exato (guia + codigo_terapia + id_convenio + user_id)
-                guia_record = None
-                if cod_terapia:
-                    guia_record = db_session.query(BaseGuia).filter(
-                        BaseGuia.guia == guia_num,
-                        BaseGuia.id_convenio == 6,
-                        BaseGuia.codigo_terapia == cod_terapia
-                    ).first()
-                
-                if not guia_record:
-                    guia_record = db_session.query(BaseGuia).filter(
-                        BaseGuia.guia == guia_num,
-                        BaseGuia.id_convenio == 6,
-                        or_(
-                            BaseGuia.codigo_terapia == None,
-                            BaseGuia.codigo_terapia == ""
-                        )
-                    ).first()
-                
-                if not guia_record:
-                    guia_record = BaseGuia(
-                        guia=guia_num,
-                        codigo_terapia=cod_terapia,
-                        id_convenio=6,
-                        user_id=job_user_id
-                    )
-                    db_session.add(guia_record)
-                    count_inserted += 1
-                else:
-                    if guia_record.user_id is None:
-                        guia_record.user_id = job_user_id
-                    elif guia_record.user_id != job_user_id:
-                        continue
-                    count_updated += 1
-                
-                guia_record.status_guia = row_data.get("status_guia")
-                guia_record.senha = row_data.get("senha")
-                guia_record.nome_terapia = row_data.get("nome_terapia")
-                
-                if "guia_prestador" in row_data:
-                    guia_record.guia_prestador = row_data["guia_prestador"]
-                
-                if cod_terapia:
-                    guia_record.codigo_terapia = cod_terapia
-                
-                if row_data.get("data_autorizacao"):
-                    guia_record.data_autorizacao = row_data["data_autorizacao"]
-                
-                if row_data.get("data_solicitacao"):
-                    guia_record.data_solicitacao = row_data["data_solicitacao"]
-                
-                if row_data.get("validade"):
-                    guia_record.validade = row_data["validade"]
-                
-                if row_data.get("qtde_solicitada") is not None:
-                    guia_record.qtde_solicitada = row_data["qtde_solicitada"]
-                
-                if row_data.get("sessoes_autorizadas") is not None:
-                    guia_record.sessoes_autorizadas = row_data["sessoes_autorizadas"]
-                
-                if row_data.get("codigo_beneficiario"):
-                    guia_record.codigo_beneficiario = row_data["codigo_beneficiario"]
-                    cart = db_session.query(Carteirinha).filter(
-                        Carteirinha.codigo_beneficiario == row_data["codigo_beneficiario"],
-                        Carteirinha.user_id == job_user_id
-                    ).first()
-                    if cart:
-                        guia_record.carteirinha_id = cart.id
 
-            db_session.commit()
-            if logger:
-                logger.info(f"Salvos {count_inserted} novos, {count_updated} atualizados em base_guias locais (Worker DB)")
-        finally:
-            db_session.close()
-    except Exception as db_err:
-        if logger:
-            logger.error(f"Erro ao salvar base_guias locais: {db_err}")
 
 def run(scraper, job_data):
     """
@@ -469,7 +367,5 @@ def run(scraper, job_data):
         
     scraper.log(f"OP11 - Extração concluída. Total de linhas (guia+procedimento): {len(todas_guias_extraidas)}", job_id=job_id)
     
-    # 4. Persistência — Upsert por chave composta (guia + codigo_terapia + id_convenio)
-    # _save_rows_local(todas_guias_extraidas, scraper.logger if hasattr(scraper, 'logger') else logging.getLogger(), job_user_id=getattr(scraper, 'user_id', None))
     
     return todas_guias_extraidas

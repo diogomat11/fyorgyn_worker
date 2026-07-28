@@ -12,7 +12,7 @@
 3. Se o Elemento da tabela aparecer e contiver os links normatizados:
    - A guia já tinha pertencimento natural na tela (já fora preenchida no passado mas não gravada).
    - Capta o horário impresso na Tabela através de Parsing e formata pra Data Python (`timestamp_captura`).
-   - Salva esse registro de captura no banco de Dados para pular etapas e retorna como `"Capturado"` junto a tag interna `pre_filter: True`. O job finaliza com Sucesso de antemão.
+   - Retorna o resultado com o `timestamp_captura` no JSON do job para o dispatcher, sem persistir diretamente no banco local do Hub. O job finaliza com Sucesso.
 
 ## 3. Fase de Re-Captura e Inserção Biometrica - "new_exame"
 Caso a fase 2 não encontre a guia solta na listagem inicial, inicia o fluxo detalhista.
@@ -27,7 +27,7 @@ Caso a fase 2 não encontre a guia solta na listagem inicial, inicia o fluxo det
    - Clica sobre ela, entra na tela da Guia autorizada e dá submit nos links de finalização/vínculo que aparecerem, com prioridade para ID `button_confirmar_voltar` ou pelo menos `button_confirmar`. Ambos amarram de verdade essa guia no WebPortal para a instituição logada.
    - Fecha tudo.
 
-## 4. Fase de Pós-Filtro
+## 4. Fase de Pós-Filtro e Retorno
 1. Na janela Principal nativa remanescente (SADTs Abertas). O script varre *DE NOVO* o campo de input de Filtro global digitando o número da referida Guia que se acabara de capturar, garantindo que o Web Portal SGUCard validou as informações inseridas na Biometria. 
 2. Retira o exato e acurado Horário emitido visualmente pelo site (`timestamp_captura`) que simbolizará o marco final que a guia ficou atestada online para a operadora.
-3. Retorna sucesso e marca status do agendamento para captura finalizada e pre-filtro como `False`.
+3. Retorna sucesso contendo o `timestamp_captura` no payload do resultado. O Hub Backend, ao receber o webhook, será encarregado de gravar este timestamp no banco de dados público (tabela `BaseGuia`).

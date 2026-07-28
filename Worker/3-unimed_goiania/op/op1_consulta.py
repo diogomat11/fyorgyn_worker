@@ -17,7 +17,7 @@ def execute(scraper, job_data):
     Executa consulta de guias (Rotina 1) para Unimed Goiania.
     """
     job_id = job_data.get("job_id")
-    carteirinha = job_data.get("carteirinha")
+    carteirinha = job_data.get("carteirinha") or job_data.get("Carteira") or job_data.get("carteira")
     carteirinha_db_id = job_data.get("carteirinha_id")
     
     scraper.log(f"Processando carteirinha: {carteirinha}", job_id=job_id, carteirinha_id=carteirinha_db_id)

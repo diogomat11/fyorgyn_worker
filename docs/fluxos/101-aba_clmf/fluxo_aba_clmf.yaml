@@ -1,0 +1,52 @@
+convenio:
+  id: 101
+  nome: "ABA_clmf"
+  url: "https://abalarissamartinsferreira.com.br/"
+  descricao: "Integrador de Agendamentos da Clínica Larissa Martins Ferreira"
+
+operacoes:
+  op0_login:
+    descricao: "Autenticação via Selenium para captura de cookies de sessão"
+    parametros:
+      - login (user_email)
+      - senha (user_password)
+    tipo: "Selenium Chrome"
+    retorno: "Sessão armazenada no Scraper"
+
+  op1_importar_agendamentos:
+    descricao: "Requisita agendamentos via POST HTTP para Schedule.ajax.php"
+    endpoint: "https://abalarissamartinsferreira.com.br/_ajax/Schedule.ajax.php"
+    metodo: "POST"
+    parametros:
+      - data_inicio
+      - data_fim
+      - id_paciente (0 = todos)
+    filtros:
+      - "schedule_local_id em [1, 3, 5]"
+    retorno: "Lista de agendamentos formatados"
+
+  op2_consultar_carteirinha:
+    descricao: "Extrai carteirinhas do paciente via GET HTTP em /clients/create/{id_paciente}"
+    endpoint: "https://abalarissamartinsferreira.com.br/clients/create/{id_paciente}"
+    metodo: "GET"
+    parametros:
+      - id_paciente
+      - agendamentos_pendentes
+    retorno: "Objeto com carteirinhas extraídas e agendamentos pendentes"
+
+mapeamento_convenios:
+  IDs_fixos:
+    - 3: "Unimed Goiânia"
+    - 6: "IPASGO"
+    - 8: "Sulamerica"
+    - 9: "Amil"
+    - 21: "UNIMED INTERCAMBIO (OPs Unimed Goiânia)"
+    - 31: "IPASGO GERAL (OPs IPASGO)"
+  Dinamicos:
+    - "Demais convênios são vinculados/criados sequencialmente na tabela convenios via match de nome ou auto-increment"
+
+regras_backend_hub:
+  - "Worker NÃO acessa schema public"
+  - "Backend Hub realiza UPSERT em agendamentos"
+  - "Se paciente sem carteirinha, Backend Hub dispara Job Op2"
+  - "Após Op2, Backend Hub cadastra carteirinha e grava agendamentos pendentes"
