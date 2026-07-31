@@ -132,7 +132,17 @@ def process_job(job: JobRequest):
             meta = results
             print(f">>> Job {job.job_id} self-persisted: {meta.get('inserted', 0)} inserted, {meta.get('updated', 0)} updated")
             return {"status": "success", "data": [], "meta": meta, "job_id": job.job_id}
-        
+
+        # Handle dict results that carry a list under "data" plus extra metadata
+        # (ex.: op1_consulta da Unimed Goiania devolve {"data": [...], "valida_prestador": {...}}).
+        # O envelope raiz recebe as chaves extras (valida_prestador) para que o Hub
+        # possa ler res_data.get("valida_prestador") no consumer do webhook.
+        if isinstance(results, dict) and isinstance(results.get("data"), list):
+            envelope = {"status": "success", "job_id": job.job_id}
+            envelope.update(results)  # inclui "data" e quaisquer chaves extras
+            print(f">>> Returning {len(envelope.get('data'))} items for Job {job.job_id} (dict payload)")
+            return envelope
+
         print(f">>> Returning {len(results) if results else 0} items for Job {job.job_id}")
         return {"status": "success", "data": results, "job_id": job.job_id}
         

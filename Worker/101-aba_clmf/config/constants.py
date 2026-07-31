@@ -63,3 +63,29 @@ SITUACAO_REMOVER_CONFIRMACAO = 0
 ACTION_CONFIRMAR = "update_confirmar_atendimento"
 ACTION_GRAVAR_FALTA = "gravarFaltaBloco"
 ACTION_REMOVER_FALTA = "remove_falta_block"
+
+# ─── OP6: Atualizar RC (Relatorio Clinico Mensal) ──────────────────────────
+# Replica de clmf_hub_basic/worker/Worker/clmf_scraper.py
+AJAX_RC_URL = f"{BASE_URL}/_ajax/RelatorioMensalIpasgo.ajax.php"
+PRONTUARIO_URL_TEMPLATE = f"{BASE_URL}/prontuarios/prontuario/{{id_paciente}}"
+ACTION_GRAVAR_RC = "gravar"
+ACTION_GERAR_RELATORIO = "gerarRelatorio"
+CALLBACK_RC = "RelatorioMensalIpasgo"
+
+# Seletor indicando login ativo (titulo do menu de clientes)
+LOGIN_READY_TITLE = "Ver CLIENTES"
+LOGIN_READY_XPATH = f'//*[@title="{LOGIN_READY_TITLE}"]'
+
+# IDs de elementos do DOM do prontuario (extracao RC)
+DOM_NOME_FOLLOWING_STRONG_XPATH = "//span[contains(text(), 'Nome:')]/following-sibling::strong"
+DOM_CARTEIRINHA_ID = "amil_client_carteirinha"
+DOM_JUSTIFICATIVA_ID = "ipasgo_justificativa_periodo_tratamento"
+DOM_EVOLUCAO_ID = "ipasgo_evolucao_paciente"
+
+# Codigos de erro especificos da OP6
+CODE_WIPEOUT_BLOCK = "WIPEOUT_BLOCK"
+CODE_AJAX_FAIL = "AJAX_FAIL"
+CODE_PDF_NOT_GENERATED = "PDF_NOT_GENERATED"
+CODE_DOWNLOAD_FAIL = "DOWNLOAD_FAIL"
+CODE_INVALID_DATE = "INVALID_DATE"
+CODE_EXTRACT_FAIL = "EXTRACT_FAIL"

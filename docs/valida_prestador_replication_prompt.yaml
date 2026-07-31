@@ -1,0 +1,494 @@
+# =============================================================================
+# PROMPT DE REPLICAÇÃO: Feature valida_prestador (Status de Guias por Job)
+# Sistema de referência: Agenda Hub Basic (clmf_hub_unimed)
+# Data de geração: 2026-03-18
+# =============================================================================
+#
+# CONTEXTO GERAL
+# ==============
+# No sistema Agenda Hub Basic, cada Job de automação processa as guias de um
+# paciente/carteirinha via robô (worker). Ao final do processamento, o robô
+# grava na coluna `valida_prestador` (JSONB) da tabela `jobs` um objeto JSON
+# estruturado indicando o resultado de cada guia.
+#
+# Este prompt descreve como replicar essa funcionalidade completa em outro
+# sistema FastAPI + React, cobrindo:
+#   1. Migration SQL para criação da coluna
+#   2. Modelo SQLAlchemy e serialização no backend
+#   3. Lógica de leitura e interpretação do JSON
+#   4. Frontend React: ícones interativos, tooltip e modal de detalhes
+#
+# =============================================================================
+
+feature:
+  name: valida_prestador — Status de Guias por Job
+  description: >
+    Ao concluir o processamento de um Job, o worker (robô) salva na coluna
+    `valida_prestador` um JSON que descreve o resultado de cada guia encontrada
+    (válida ou bloqueada). O frontend lê esse JSON e exibe um ícone interativo
+    com tooltip na listagem de Jobs. Ao clicar no ícone, um modal exibe o
+    detalhamento guia-a-guia.
+
+# =============================================================================
+# PARTE 1 — MIGRATION SQL
+# =============================================================================
+migration:
+  file_name: "XXXX_add_valida_prestador_jobs.sql"
+  description: >
+    Adiciona a coluna `valida_prestador` do tipo JSONB à tabela `jobs`.
+    Deve ser executada via o sistema de migrations do projeto (ex: migrate_runner.py).
+  sql: |
+    -- Migration: Add valida_prestador column to jobs table
+    ALTER TABLE jobs ADD COLUMN IF NOT EXISTS valida_prestador JSONB;
+
+  notes:
+    - "Use JSONB (não JSON) para permitir indexação e queries eficientes no PostgreSQL."
+    - "A coluna é nullable — jobs pendentes ou sem guias terão NULL nesse campo."
+    - "Se o banco for SQLite (ambiente de dev), substitua JSONB por TEXT e trate o parse no backend."
+
+# =============================================================================
+# PARTE 2 — BACKEND (FastAPI + SQLAlchemy)
+# =============================================================================
+backend:
+
+  # 2.1 — Modelo SQLAlchemy
+  model:
+    file: "backend/models.py"
+    class: "Job"
+    description: >
+      Adicionar o campo `valida_prestador` como Column(JSON) ao modelo Job.
+      O SQLAlchemy gerencia a serialização/deserialização automaticamente.
+    code: |
+      from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, JSON
+      from sqlalchemy.orm import relationship
+      from sqlalchemy.sql import func
+      from database import Base
+
+      class Job(Base):
+          __tablename__ = "jobs"
+
+          id               = Column(Integer, primary_key=True, index=True)
+          carteirinha_id   = Column(Integer, ForeignKey("carteirinhas.id", ondelete="CASCADE"))
+          status           = Column(Text, nullable=False, default="pending", index=True)
+          # valores possíveis: "pending", "processing", "success", "error"
+          attempts         = Column(Integer, default=0)
+          priority         = Column(Integer, default=0)
+          locked_by        = Column(Text)        # URL/hostname do worker que está processando
+          timeout          = Column(DateTime(timezone=True))
+          valida_prestador = Column(JSON, nullable=True)  # <-- CAMPO NOVO
+          created_at       = Column(DateTime(timezone=True), server_default=func.now())
+          updated_at       = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+          carteirinha_rel  = relationship("Carteirinha", back_populates="jobs")
+          logs             = relationship("Log", back_populates="job_rel", cascade="all, delete-orphan")
+
+  # 2.2 — Estrutura esperada do JSON gravado pelo worker
+  json_schema:
+    description: >
+      O worker grava o JSON no seguinte formato após concluir o processamento.
+      O campo `tipo_json` é o discriminador principal lido pelo frontend.
+    structure:
+      tipo_json:
+        type: string
+        description: >
+          Classificação geral do resultado. Valores possíveis:
+            - "All Sucess"  → todas as guias com vínculo válido
+            - "Thered"      → ao menos uma guia com vínculo bloqueado
+            - "Null"        → nenhuma guia encontrada / erro sem guias
+        required: true
+      guias:
+        type: object
+        description: >
+          Dicionário onde cada chave é o número/código da guia e o valor
+          é um objeto com os atributos daquela guia.
+        required: false  # ausente quando tipo_json == "Null"
+        value_schema:
+          codigo_terapia:
+            type: string
+            description: "Código da especialidade/terapia (ex: '50000470')"
+          Vinculo_prestador:
+            type: string
+            description: >
+              Status do vínculo. Valores possíveis:
+                - "Guia Válida"     → guia em ordem, prestador vinculado
+                - "Guia Bloqueada"  → guia com problema no vínculo do prestador
+
+    example_all_success: |
+      {
+        "tipo_json": "All Sucess",
+        "guias": {
+          "123456": {
+            "codigo_terapia": "50000470",
+            "Vinculo_prestador": "Guia Válida"
+          },
+          "789012": {
+            "codigo_terapia": "50000471",
+            "Vinculo_prestador": "Guia Válida"
+          }
+        }
+      }
+
+    example_thered: |
+      {
+        "tipo_json": "Thered",
+        "guias": {
+          "123456": {
+            "codigo_terapia": "50000470",
+            "Vinculo_prestador": "Guia Válida"
+          },
+          "789012": {
+            "codigo_terapia": "50000471",
+            "Vinculo_prestador": "Guia Bloqueada"
+          }
+        }
+      }
+
+    example_null: |
+      {
+        "tipo_json": "Null"
+      }
+
+  # 2.3 — Endpoint GET /jobs/ — Serialização correta do campo
+  endpoint_list_jobs:
+    file: "backend/routes/jobs.py"
+    method: "GET"
+    path: "/jobs/"
+    description: >
+      O endpoint lista os jobs com paginação e deve incluir `valida_prestador`
+      no dicionário de retorno. Também incluir `paciente` e `carteirinha`
+      via join do relacionamento carteirinha_rel, para exibir no modal do frontend.
+    code: |
+      from fastapi import APIRouter, Depends, Query
+      from sqlalchemy.orm import Session
+      from database import get_db
+      from models import Job
+      from typing import Optional
+      from datetime import date, datetime, timedelta
+
+      router = APIRouter(prefix="/jobs", tags=["Jobs"])
+
+      @router.get("/")
+      def list_jobs(
+          status: Optional[str] = None,
+          created_at_start: Optional[date] = None,
+          created_at_end: Optional[date] = None,
+          limit: int = 25,
+          skip: int = 0,
+          db: Session = Depends(get_db),
+      ):
+          query = db.query(Job)
+
+          if status:
+              query = query.filter(Job.status == status)
+          if created_at_start:
+              query = query.filter(Job.created_at >= created_at_start)
+          if created_at_end:
+              end_dt = datetime.combine(created_at_end, datetime.min.time()) + timedelta(days=1)
+              query = query.filter(Job.created_at < end_dt)
+
+          total = query.count()
+          jobs = query.order_by(Job.priority.desc(), Job.created_at.desc()).limit(limit).offset(skip).all()
+
+          def job_to_dict(j):
+              return {
+                  "id":                j.id,
+                  "carteirinha_id":    j.carteirinha_id,
+                  "status":            j.status,
+                  "attempts":          j.attempts,
+                  "priority":          j.priority,
+                  "locked_by":         j.locked_by,
+                  "valida_prestador":  j.valida_prestador,   # <-- incluir sempre
+                  "created_at":        j.created_at,
+                  "updated_at":        j.updated_at,
+                  # join para exibir no modal de detalhes do frontend:
+                  "paciente":          j.carteirinha_rel.paciente    if j.carteirinha_rel else None,
+                  "carteirinha":       j.carteirinha_rel.carteirinha if j.carteirinha_rel else None,
+              }
+
+          return {"data": [job_to_dict(j) for j in jobs], "total": total, "skip": skip, "limit": limit}
+
+    notes:
+      - "O campo `paciente` é populado via join (carteirinha_rel) e usado como título do modal no frontend."
+      - "O campo `valida_prestador` pode ser None; o frontend deve tratar esse caso exibindo o ícone ShieldOff."
+
+  # 2.4 — Como o worker grava o campo (lado do robô)
+  worker_write_logic:
+    description: >
+      O robô (worker Python) ao final do scraping/automação deve montar o
+      dicionário e gravá-lo no campo `valida_prestador` do Job via SQLAlchemy
+      ou via request HTTP para o endpoint de update do job.
+    pseudocode: |
+      # Após scraping, montar o resultado:
+      resultado = {
+          "tipo_json": "All Sucess",  # ou "Thered" ou "Null"
+          "guias": {
+              "<numero_guia>": {
+                  "codigo_terapia": "<codigo>",
+                  "Vinculo_prestador": "Guia Válida"  # ou "Guia Bloqueada"
+              }
+          }
+      }
+
+      # Gravar via SQLAlchemy (se o worker tem acesso ao banco):
+      job = db.query(Job).filter(Job.id == job_id).first()
+      job.valida_prestador = resultado
+      job.status = "success"
+      db.commit()
+
+      # OU gravar via API HTTP (se o worker é desacoplado):
+      requests.patch(f"{API_BASE}/jobs/{job_id}", json={"valida_prestador": resultado, "status": "success"})
+
+    rules:
+      - "tipo_json deve ser exatamente 'All Sucess', 'Thered' ou 'Null' (case-sensitive — manter assim para compatibilidade com o frontend existente)."
+      - "A chave de cada guia no dicionário `guias` é o número/código da guia como string."
+      - "A chave `Vinculo_prestador` usa maiúsculo em V e p — manter a grafia exata."
+
+# =============================================================================
+# PARTE 3 — FRONTEND (React)
+# =============================================================================
+frontend:
+  file: "frontend/src/pages/Importacoes.jsx"  # ou equivalente no novo sistema
+  dependencies:
+    lucide_react:
+      - ShieldCheck   # ícone: todas guias válidas
+      - ShieldAlert   # ícone: guias com bloqueio
+      - ShieldOff     # ícone: sem guias / null
+      - XCircle       # ícone: fechar modal
+
+  # 3.1 — Lógica de exibição do ícone na coluna "Status Guias"
+  status_icon_logic:
+    description: >
+      Na tabela de Jobs, a coluna "Status Guias" renderiza um ícone + texto
+      baseado no valor de `job.valida_prestador.tipo_json`. O elemento é
+      clicável para abrir o modal de detalhes quando há guias disponíveis.
+    jsx_code: |
+      import { ShieldCheck, ShieldAlert, ShieldOff, XCircle } from 'lucide-react';
+
+      // Dentro do map de jobs, na célula da coluna "Status Guias":
+      <td className="px-6 py-4 text-sm">
+        {(() => {
+          const json = job.valida_prestador;
+
+          // Caso 1: sem dados ou tipo Null
+          if (!json || json.tipo_json === 'Null' || !json.tipo_json) {
+            return (
+              <span
+                className="inline-flex items-center gap-1.5 text-red-400 cursor-default"
+                title="Sem guias processadas"
+              >
+                <ShieldOff size={18} className="text-red-400" />
+                <span className="text-xs">Sem Guias</span>
+              </span>
+            );
+          }
+
+          // Caso 2: todas as guias válidas
+          if (json.tipo_json === 'All Sucess') {
+            return (
+              <button
+                className="inline-flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
+                title="Guias Válidas Importadas — Clique para ver detalhes"
+                onClick={() => handleOpenGuiasModal(job)}
+              >
+                <ShieldCheck size={18} />
+                <span className="text-xs font-medium">Válidas</span>
+              </button>
+            );
+          }
+
+          // Caso 3: há guias bloqueadas
+          if (json.tipo_json === 'Thered') {
+            return (
+              <button
+                className="inline-flex items-center gap-1.5 text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+                title="Possui Guias Bloqueadas — Clique para ver detalhes"
+                onClick={() => handleOpenGuiasModal(job)}
+              >
+                <ShieldAlert size={18} />
+                <span className="text-xs font-medium">Bloqueadas</span>
+              </button>
+            );
+          }
+
+          return <span className="text-text-secondary">-</span>;
+        })()}
+      </td>
+
+  # 3.2 — Handler para abrir o modal
+  modal_open_handler:
+    description: >
+      Controla o estado do modal. O job selecionado é armazenado no estado
+      para ser lido pelo componente do modal.
+    state: |
+      const [selectedJobForModal, setSelectedJobForModal] = useState(null);
+
+    handler: |
+      const handleOpenGuiasModal = (job) => {
+        // Só abre se houver guias no JSON
+        if (job.valida_prestador && job.valida_prestador.guias) {
+          setSelectedJobForModal(job);
+        } else {
+          alert("Nenhum detalhe de guias encontrado neste job.");
+        }
+      };
+
+  # 3.3 — Modal de detalhes das guias
+  modal_component:
+    description: >
+      Modal fullscreen (overlay) exibindo uma tabela com o detalhamento de
+      cada guia do Job. O título exibe o nome do paciente e o ID do job.
+      As guias com Vinculo_prestador "Guia Válida" ficam em verde e
+      "Guia Bloqueada" ficam em âmbar.
+    jsx_code: |
+      {selectedJobForModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-surface max-w-3xl w-full max-h-[90vh] flex flex-col rounded-xl border border-border pt-4 px-6 pb-6">
+
+            {/* Header */}
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-xl font-bold text-text-primary">
+                  Paciente: {selectedJobForModal.paciente || 'Não Identificado'}
+                </h3>
+                <span className="text-sm text-text-secondary">
+                  Job #{selectedJobForModal.id}
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedJobForModal(null)}
+                className="text-text-secondary hover:text-text-primary"
+              >
+                <XCircle size={24} />
+              </button>
+            </div>
+
+            {/* Tabela de guias */}
+            <div className="flex-1 overflow-y-auto pr-2">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-slate-900/80 sticky top-0 text-xs uppercase text-text-secondary">
+                  <tr>
+                    <th className="px-4 py-3 border-b border-border">Número Guia</th>
+                    <th className="px-4 py-3 border-b border-border">Código Terapia</th>
+                    <th className="px-4 py-3 border-b border-border">Vínculo Prestador</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {Object.entries(selectedJobForModal.valida_prestador.guias || {}).map(([guia_key, attr]) => (
+                    <tr key={guia_key} className="hover:bg-slate-800/40">
+                      <td className="px-4 py-3 text-sm text-text-primary font-mono">{guia_key}</td>
+                      <td className="px-4 py-3 text-sm text-text-secondary">{attr.codigo_terapia}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <span
+                          className={
+                            attr.Vinculo_prestador === 'Guia Válida'
+                              ? 'text-emerald-500 font-medium'
+                              : 'text-amber-500 font-medium'
+                          }
+                        >
+                          {attr.Vinculo_prestador}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+  # 3.4 — Imports necessários no arquivo do frontend
+  required_imports: |
+    import { ShieldCheck, ShieldAlert, ShieldOff, XCircle } from 'lucide-react';
+    // Demais imports já existentes do componente (Button, Badge, api, etc.)
+
+  # 3.5 — CSS / Estilização
+  styling_notes:
+    - "O design usa um sistema de classes utilitárias (similar a TailwindCSS) com variáveis CSS customizadas."
+    - "Cores semânticas usadas: text-emerald-400 (válido), text-amber-400 (bloqueado), text-red-400 (sem guias)."
+    - "O modal usa z-50, fixed, inset-0 para overlay fullscreen responsivo."
+    - "A tabela interna usa sticky header (sticky top-0) para facilitar a leitura em listas grandes."
+    - "Os botões de status têm hover transition (hover:text-emerald-300, hover:text-amber-300) para indicar clicabilidade."
+    - "O ícone ShieldOff (sem guias) tem cursor-default pois NÃO é clicável — não há dados para exibir."
+
+# =============================================================================
+# PARTE 4 — CHECKLIST DE IMPLEMENTAÇÃO
+# =============================================================================
+implementation_checklist:
+  - step: 1
+    area: Database
+    task: "Criar e executar a migration SQL adicionando a coluna `valida_prestador JSONB` na tabela `jobs`."
+    done: false
+
+  - step: 2
+    area: Backend / Model
+    task: "Adicionar `valida_prestador = Column(JSON, nullable=True)` ao modelo SQLAlchemy da classe Job."
+    done: false
+
+  - step: 3
+    area: Backend / API
+    task: >
+      No endpoint GET /jobs/, incluir `valida_prestador` no dicionário de retorno.
+      Também incluir `paciente` e `carteirinha` via join do relacionamento.
+    done: false
+
+  - step: 4
+    area: Worker / Robô
+    task: >
+      Ao finalizar o processamento, o worker deve montar o dicionário no formato
+      especificado (tipo_json + guias) e gravá-lo no campo `valida_prestador` do Job.
+    done: false
+
+  - step: 5
+    area: Frontend / State
+    task: "Adicionar estado `selectedJobForModal` e handler `handleOpenGuiasModal` ao componente."
+    done: false
+
+  - step: 6
+    area: Frontend / Tabela
+    task: >
+      Na coluna 'Status Guias' da tabela de Jobs, implementar a renderização
+      condicional dos ícones com base em `job.valida_prestador.tipo_json`.
+    done: false
+
+  - step: 7
+    area: Frontend / Modal
+    task: "Implementar o modal de detalhes com a tabela de guias e botão de fechar."
+    done: false
+
+  - step: 8
+    area: Frontend / Imports
+    task: "Adicionar imports do lucide-react: ShieldCheck, ShieldAlert, ShieldOff, XCircle."
+    done: false
+
+# =============================================================================
+# PARTE 5 — NOTAS IMPORTANTES / ARMADILHAS
+# =============================================================================
+gotchas:
+  - id: 1
+    description: >
+      O valor "All Sucess" no campo tipo_json tem um erro de digitação intencional
+      (deveria ser "All Success"). Mantenha EXATAMENTE esse valor nos dois lados
+      (worker e frontend) para garantir compatibilidade. Não "corrija" para "All Success".
+
+  - id: 2
+    description: >
+      A chave `Vinculo_prestador` usa V maiúsculo e p minúsculo — é case-sensitive
+      no JavaScript ao acessar `attr.Vinculo_prestador`. Manter exatamente assim.
+
+  - id: 3
+    description: >
+      O ícone ShieldOff NÃO é um button clicável. Apenas ShieldCheck e ShieldAlert
+      são botões que abrem o modal. ShieldOff usa <span> com cursor-default.
+
+  - id: 4
+    description: >
+      O campo `paciente` no retorno do endpoint NÃO vem da tabela `jobs` diretamente,
+      mas do relacionamento `carteirinha_rel.paciente`. Garanta que o eager/lazy loading
+      do SQLAlchemy esteja configurado corretamente para evitar N+1 queries.
+
+  - id: 5
+    description: >
+      Em SQLite (ambiente de desenvolvimento), a coluna JSONB não existe. Use TEXT
+      e faça o parse manual com json.loads() no backend antes de retornar ao frontend.
+      Em produção (PostgreSQL), o SQLAlchemy Column(JSON) funciona nativamente.

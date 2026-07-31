@@ -1,9 +1,28 @@
 import time
 import datetime
+import os
+import sys
+import requests
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
+
+# Helper de validacao de vinculo de prestador (getErrosSapia)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+try:
+    from infra.valida_prestador import (
+        validar_vinculo_prestador, extrair_cd_guia_da_url,
+        montar_valida_prestador_json, marcar_procedimento_habilitado,
+    )
+except Exception as _imp_err:
+    # Fallback defensivo: se o helper nao for importavel, a consulta de guias
+    # continua funcionando sem validacao de prestador (valida_prestador ausente).
+    validar_vinculo_prestador = None
+    extrair_cd_guia_da_url = None
+    montar_valida_prestador_json = None
+    marcar_procedimento_habilitado = None
+    print(f"[op1_consulta] Aviso: helper valida_prestador indisponivel: {_imp_err}")
 
 def funccarteira(carteirinha):
     import re
@@ -15,11 +34,23 @@ def funccarteira(carteirinha):
 def execute(scraper, job_data):
     """
     Executa consulta de guias (Rotina 1) para Unimed Goiania.
+
+    Retorna dict no formato:
+        {"data": [<lista de guias>], "valida_prestador": {"tipo_json": ..., "guias": {...}}}
+    O server.py faz merge das chaves extras no envelope raiz do result_data,
+    permitindo que o Hub leia res_data.get("valida_prestador").
     """
     job_id = job_data.get("job_id")
     carteirinha = job_data.get("carteirinha") or job_data.get("Carteira") or job_data.get("carteira")
     carteirinha_db_id = job_data.get("carteirinha_id")
-    
+
+    # Lista de procedimentos habilitados recebida do Hub via params (opcional).
+    # Se ausente, o worker nao filtra/marca guias por procedimento.
+    procedimentos_habilitados = job_data.get("procedimentos_habilitados")
+
+    # Acumulador de validacao de vinculo de prestador por guia.
+    valida_guias = {}
+
     scraper.log(f"Processando carteirinha: {carteirinha}", job_id=job_id, carteirinha_id=carteirinha_db_id)
     
     handles = scraper.driver.window_handles
@@ -33,6 +64,20 @@ def execute(scraper, job_data):
             return True
         except NoSuchElementException:
             return False
+
+    # Helper para montar o retorno padronizado {data, valida_prestador}.
+    # Marcacao de procedimento_habilitado so e aplicada se a lista estiver
+    # presente nos params do job (recebida do Hub).
+    def _build_result(data_list):
+        vg = valida_guias
+        if marcar_procedimento_habilitado is not None and procedimentos_habilitados:
+            vg = marcar_procedimento_habilitado(dict(vg), procedimentos_habilitados)
+        vp_json = (
+            montar_valida_prestador_json(vg)
+            if montar_valida_prestador_json is not None
+            else {"tipo_json": "Null", "guias": {}}
+        )
+        return {"data": data_list, "valida_prestador": vp_json}
 
 
     scraper.log("Starting scraping loop...", job_id=job_id, carteirinha_id=carteirinha_db_id)
@@ -89,7 +134,7 @@ def execute(scraper, job_data):
          scraper.log("Timeout waiting for results table. Maybe no guias or connection error.", level="WARNING", job_id=job_id, carteirinha_id=carteirinha_db_id)
          scraper.driver.close()
          scraper.driver.switch_to.window(scraper.driver.window_handles[0])
-         return []
+         return _build_result([])
 
     # Sort by Date (click header twice)
     scraper.log("Sorting table by date (Clicking header twice)...", job_id=job_id, carteirinha_id=carteirinha_db_id)
@@ -161,7 +206,7 @@ def execute(scraper, job_data):
                             scraper.log(f"Guia date {date_text} is older than limit. Stopping.", job_id=job_id, carteirinha_id=carteirinha_db_id)
                             scraper.driver.close()
                             scraper.driver.switch_to.window(scraper.driver.window_handles[0])
-                            return collected_data
+                            return _build_result(collected_data)
 
                         link_element = scraper.driver.find_element(By.XPATH, f'{row_xpath}/td[4]/a')
                         link_element.click()
@@ -189,7 +234,39 @@ def execute(scraper, job_data):
                                 }
                                 collected_data.append(guia_data)
                                 scraper.log(f"Scraped Guia {new_num_guia}", job_id=job_id, carteirinha_id=carteirinha_db_id)
-                                
+
+                                # ── Validacao de vinculo do prestador (getErrosSapia) ──
+                                # Consulta a API para classificar a guia como "Guia Valida"
+                                # ou capturar a mensagem de erro da Unimed.
+                                if validar_vinculo_prestador is not None:
+                                    try:
+                                        current_url = scraper.driver.current_url or ""
+                                        cd_guia = extrair_cd_guia_da_url(current_url)
+                                        if cd_guia:
+                                            # Reaproveitar cookies do Selenium em uma session requests
+                                            vp_session = requests.Session()
+                                            for ck in scraper.driver.get_cookies():
+                                                vp_session.cookies.set(ck['name'], ck['value'])
+                                            vp_result = validar_vinculo_prestador(vp_session, cd_guia)
+                                            vp_result["codigo_procedimento"] = cod_terapia or new_num_guia
+                                            valida_guias[new_num_guia] = vp_result
+                                            scraper.log(
+                                                f"Validacao prestador guia {new_num_guia}: "
+                                                f"{vp_result.get('Vinculo_prestador')}",
+                                                job_id=job_id, carteirinha_id=carteirinha_db_id
+                                            )
+                                        else:
+                                            scraper.log(
+                                                f"cdGuia nao extraido da URL para guia {new_num_guia}; "
+                                                "validacao de prestador pulada.",
+                                                level="WARN", job_id=job_id, carteirinha_id=carteirinha_db_id
+                                            )
+                                    except Exception as vp_e:
+                                        scraper.log(
+                                            f"Erro na validacao de prestador da guia {new_num_guia}: {vp_e}",
+                                            level="ERROR", job_id=job_id, carteirinha_id=carteirinha_db_id
+                                        )
+
                                 scraper.driver.find_element(By.XPATH, '//*[@id="Button_Voltar"]').click()
                                 time.sleep(1)
                             else:
@@ -224,5 +301,5 @@ def execute(scraper, job_data):
     
     scraper.driver.close()
     scraper.driver.switch_to.window(scraper.driver.window_handles[0])
-    
-    return collected_data
+
+    return _build_result(collected_data)
