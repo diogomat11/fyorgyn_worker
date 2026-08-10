@@ -302,27 +302,40 @@ def execute(scraper, job_data: dict) -> list:
     page = 1
     base_page_url = "https://sgucard.unimedgoiania.coop.br/cmagnet/exames/sadt/finalizadas.do"
 
-    while True:
-        soup_page = BeautifulSoup(scraper.driver.page_source, "html.parser")
-        rows = _parse_grid_rows(soup_page)
-        scraper.log(f"[OP4] Página {page}: {len(rows)} guias encontradas na grid", job_id=job_id)
-        all_guias.extend(rows)
+    try:
+        while True:
+            try:
+                soup_page = BeautifulSoup(scraper.driver.page_source, "html.parser")
+            except Exception as page_err:
+                scraper.log(f"[OP4] Erro ao obter page_source na página {page}: {page_err}. Finalizando coleta de páginas.", level="WARN", job_id=job_id)
+                break
 
-        # Verificar link de próxima página
-        prox = soup_page.find("a", class_="MagnetoNavigatorLink", string=re.compile(r"(Pr[oó]x|Next|>>)", re.I))
-        if not prox or not prox.get("href"):
-            break
-        page += 1
-        next_href = prox.get("href", "")
-        if "javascript" in next_href.lower():
-            break
+            rows = _parse_grid_rows(soup_page)
+            scraper.log(f"[OP4] Página {page}: {len(rows)} guias encontradas na grid", job_id=job_id)
+            all_guias.extend(rows)
 
-        next_url = urllib.parse.urljoin(base_page_url, next_href)
-        scraper.log(f"[OP4] Navegando para página {page}: {next_url}", job_id=job_id)
-        scraper.driver.get(next_url)
-        time.sleep(3)
+            # Verificar link de próxima página
+            prox = soup_page.find("a", class_="MagnetoNavigatorLink", string=re.compile(r"(Pr[oó]x|Next|>>)", re.I))
+            if not prox or not prox.get("href"):
+                break
 
-    scraper.log(f"[OP4] Total de guias encontradas: {len(all_guias)}", job_id=job_id)
+            next_href = prox.get("href", "")
+            if "javascript" in next_href.lower():
+                break
+
+            page += 1
+            next_url = urllib.parse.urljoin(base_page_url, next_href)
+            scraper.log(f"[OP4] Navegando para página {page}: {next_url}", job_id=job_id)
+            try:
+                scraper.driver.get(next_url)
+                time.sleep(2)
+            except Exception as nav_err:
+                scraper.log(f"[OP4] Erro de conexão ao navegar para página {page}: {nav_err}. Prosseguindo com {len(all_guias)} guias.", level="WARN", job_id=job_id)
+                break
+    except Exception as e_pagination:
+        scraper.log(f"[OP4] Exceção na paginação: {e_pagination}. Total coletado até agora: {len(all_guias)}", level="WARN", job_id=job_id)
+
+    scraper.log(f"[OP4] Total de guias encontradas nas páginas: {len(all_guias)}", job_id=job_id)
 
     # ── FASE 5: Acessar detalhe de cada guia ──
     results = []
@@ -335,7 +348,7 @@ def execute(scraper, job_data: dict) -> list:
         scraper.log(f"[OP4] Detalhe {i}/{len(all_guias)} — guia {guia['guia']} (cd={guia['cd_guia']})", job_id=job_id)
         try:
             scraper.driver.get(detalhe_full)
-            time.sleep(2)
+            time.sleep(1.5)
             detalhe = _parse_detalhe(scraper.driver.page_source, guia)
             results.append(detalhe)
         except Exception as e:
