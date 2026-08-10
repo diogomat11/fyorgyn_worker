@@ -76,6 +76,14 @@ class UnimedScraper(BaseScraper):
 
         return bool(self.username and self.password)
 
+    def touch_activity(self):
+        """Notifica o SeleniumManager de que o driver está ativo no momento."""
+        try:
+            from server import sel_manager
+            sel_manager.touch(self.id_convenio, self.user_id)
+        except Exception:
+            pass
+
     def login_http(self):
         """
         Realiza login no SGURCard via requests.Session (sem Selenium).

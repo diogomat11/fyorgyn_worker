@@ -12,9 +12,29 @@ class SeleniumManager:
     def __init__(self, max_drivers=3):
         self.drivers = {}  # (id_convenio, user_id) -> driver_instance
         self.last_activity = {} # (id_convenio, user_id) -> datetime
+        self.processing_keys = set() # (id_convenio, user_id) em processamento ativo
         self.max_drivers = max_drivers
         self.lock = threading.Lock()
         self.inactivity_limit = timedelta(minutes=10) # Reduzido para 10 min por exigência de segurança (ex: Bradesco)
+
+    def touch(self, id_convenio, user_id=None):
+        """Atualiza a estampa de tempo de atividade do driver."""
+        with self.lock:
+            key = (id_convenio, user_id)
+            if key in self.last_activity:
+                self.last_activity[key] = datetime.now()
+            if id_convenio in self.last_activity:
+                self.last_activity[id_convenio] = datetime.now()
+
+    def set_processing(self, key, is_processing: bool):
+        """Marca se uma chave de driver está executando um job no momento."""
+        with self.lock:
+            if is_processing:
+                self.processing_keys.add(key)
+                if isinstance(key, tuple) and key in self.last_activity:
+                    self.last_activity[key] = datetime.now()
+            else:
+                self.processing_keys.discard(key)
 
     def get_driver(self, id_convenio, headless=True, user_id=None):
         with self.lock:
@@ -124,9 +144,12 @@ class SeleniumManager:
     def _evict_oldest(self):
         if not self.last_activity:
             return
-        # Find key with oldest activity
-        oldest_key = min(self.last_activity, key=self.last_activity.get)
-        print(f">>> Evicting oldest driver (Key {oldest_key}) to make room.")
+        # Find key with oldest activity that is NOT currently processing
+        idle_keys = {k: v for k, v in self.last_activity.items() if k not in self.processing_keys}
+        if not idle_keys:
+            return
+        oldest_key = min(idle_keys, key=idle_keys.get)
+        print(f">>> Evicting oldest idle driver (Key {oldest_key}) to make room.")
         self.close_driver(oldest_key)
 
     def cleanup_idle(self):
@@ -136,6 +159,8 @@ class SeleniumManager:
             to_close = []
             for key, last_time in self.last_activity.items():
                 if now - last_time > self.inactivity_limit:
+                    if key in self.processing_keys:
+                        continue  # Não fecha se o robô estiver processando ativamente
                     to_close.append(key)
             
             for key in to_close:

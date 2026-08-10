@@ -87,8 +87,10 @@ def process_job(job: JobRequest):
         raise HTTPException(status_code=409, detail="Worker is currently busy processing another job. Try again later.")
 
     db = None
+    driver_key = (job.id_convenio, job.user_id)
     try:
         db = SessionLocal()
+        sel_manager.set_processing(driver_key, True)
         print(f">>> Received Job {job.job_id} for Convenio {job.id_convenio}, Routine {job.rotina}")
         
         # 1. Get/Create Driver for this convenio
@@ -151,6 +153,7 @@ def process_job(job: JobRequest):
         traceback.print_exc()
         return {"status": "error", "message": str(e), "job_id": job.job_id}
     finally:
+        sel_manager.set_processing(driver_key, False)
         if db:
             try: db.close()
             except: pass
