@@ -29,15 +29,57 @@ class BradescoScraper(BaseScraper):
         self.username = None
         self.password = None
         self.cod_prestador = None
-        self._load_credentials()
         self.module_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 1-bradesco root
 
-    def _load_credentials(self):
+    def _extract_credentials_from_dict(self, data_dict):
+        if not data_dict or not isinstance(data_dict, dict):
+            return False
+
+        params = data_dict.get("params")
+        if isinstance(params, str):
+            try:
+                params = json.loads(params)
+            except Exception:
+                params = None
+
+        merged = {}
+        merged.update(data_dict)
+        if isinstance(params, dict):
+            merged.update(params)
+
+        login_val = merged.get("login") or merged.get("username") or merged.get("usuario")
+        if login_val:
+            self.username = str(login_val).strip()
+
+        pwd_raw = merged.get("password") or merged.get("senha")
+        if not pwd_raw and merged.get("senha_criptografada"):
+            try:
+                pwd_raw = decrypt_password(merged.get("senha_criptografada"))
+            except Exception:
+                pass
+        if pwd_raw:
+            self.password = str(pwd_raw).strip()
+
+        prest_val = (
+            merged.get("cod_prestador") or
+            merged.get("codigoPrestador") or
+            merged.get("prestador")
+        )
+        if prest_val:
+            self.cod_prestador = str(prest_val).strip()
+
+        return bool(self.username and self.password)
+
+    def _load_credentials(self, job_data=None):
         """
-        Busca credenciais na user_convenios (por user_id + id_convenio).
+        Busca credenciais via job_data ou na user_convenios (por user_id + id_convenio).
         """
         try:
-            if self.user_id:
+            if job_data and self._extract_credentials_from_dict(job_data):
+                self.log(f"Credenciais carregadas via job_data (user_id={self.user_id}, prestador={self.cod_prestador})")
+                return
+
+            if self.user_id and self.db:
                 user_conv = self.db.query(UserConvenio).filter(
                     UserConvenio.user_id == self.user_id,
                     UserConvenio.id_convenio == self.id_convenio
@@ -63,17 +105,12 @@ class BradescoScraper(BaseScraper):
         except Exception as e:
             self.log(f"Bradesco Credential Load Error: {e}", level="ERROR")
 
-    def reload_credentials(self, user_id):
-        """
-        Recarrega credenciais para um user_id diferente.
-        Chamado pelo server.py antes de processar cada job para garantir
-        isolamento multi-tenant.
-        """
+    def reload_credentials(self, user_id, job_data=None):
         self.user_id = user_id
         self.username = None
         self.password = None
         self.cod_prestador = None
-        self._load_credentials()
+        self._load_credentials(job_data)
 
     def start_driver(self):
         pass  # Managed by SeleniumManager

@@ -34,9 +34,52 @@ class AbaClmfScraper(BaseScraper):
             "Accept": "*/*"
         })
 
-    def _load_credentials(self):
+    def _extract_credentials_from_dict(self, data_dict):
+        if not data_dict or not isinstance(data_dict, dict):
+            return False
+
+        params = data_dict.get("params")
+        if isinstance(params, str):
+            try:
+                params = json.loads(params)
+            except Exception:
+                params = None
+
+        merged = {}
+        merged.update(data_dict)
+        if isinstance(params, dict):
+            merged.update(params)
+
+        login_val = merged.get("login") or merged.get("username") or merged.get("usuario")
+        if login_val:
+            self.username = str(login_val).strip()
+
+        pwd_raw = merged.get("password") or merged.get("senha")
+        if not pwd_raw and merged.get("senha_criptografada"):
+            try:
+                pwd_raw = decrypt_password(merged.get("senha_criptografada"))
+            except Exception:
+                pass
+        if pwd_raw:
+            self.password = str(pwd_raw).strip()
+
+        prest_val = (
+            merged.get("cod_prestador") or
+            merged.get("codigoPrestador") or
+            merged.get("prestador")
+        )
+        if prest_val:
+            self.cod_prestador = str(prest_val).strip()
+
+        return bool(self.username and self.password)
+
+    def _load_credentials(self, job_data=None):
         try:
-            if self.user_id:
+            if job_data and self._extract_credentials_from_dict(job_data):
+                self.log(f"Credenciais ABA_clmf carregadas via job_data (user_id={self.user_id})")
+                return
+
+            if self.user_id and self.db:
                 user_conv = self.db.query(UserConvenio).filter(
                     UserConvenio.user_id == self.user_id,
                     UserConvenio.id_convenio == self.id_convenio
@@ -47,16 +90,16 @@ class AbaClmfScraper(BaseScraper):
                     self.cod_prestador = user_conv.cod_prestador
                     self.log(f"Credenciais ABA_clmf carregadas (user_id={self.user_id})")
                     return
-            self.log(f"Credenciais ABA_clmf nao encontradas para user_id={self.user_id}", level="ERROR")
+            self.log(f"Credenciais ABA_clmf nao encontradas para user_id={self.user_id}", level="WARN")
         except Exception as e:
             self.log(f"ABA_clmf Credential Load Error: {e}", level="ERROR")
 
-    def reload_credentials(self, user_id):
+    def reload_credentials(self, user_id, job_data=None):
         self.user_id = user_id
         self.username = None
         self.password = None
         self.cod_prestador = None
-        self._load_credentials()
+        self._load_credentials(job_data)
 
     def start_driver(self):
         pass # Managed by SeleniumManager
@@ -134,6 +177,11 @@ class AbaClmfScraper(BaseScraper):
                         job_data.update(parsed)
                 except Exception as e:
                     self.log(f"Failed to parse job params: {e}", level="WARN", job_id=job_id)
+
+        # Garantir extração de credenciais a partir do job_data/params mesclado (schema isolation)
+        self._extract_credentials_from_dict(job_data)
+        if not self.username or not self.password:
+            self._load_credentials(job_data)
 
         results = []
         error_msg = None

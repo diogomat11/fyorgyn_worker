@@ -24,15 +24,57 @@ class IpasgoScraper(BaseScraper):
         self.username = None
         self.password = None
         self.cod_prestador = None
-        self._load_credentials()
         self.module_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # 6-ipasgo root
 
-    def _load_credentials(self):
+    def _extract_credentials_from_dict(self, data_dict):
+        if not data_dict or not isinstance(data_dict, dict):
+            return False
+
+        params = data_dict.get("params")
+        if isinstance(params, str):
+            try:
+                params = json.loads(params)
+            except Exception:
+                params = None
+
+        merged = {}
+        merged.update(data_dict)
+        if isinstance(params, dict):
+            merged.update(params)
+
+        login_val = merged.get("login") or merged.get("username") or merged.get("usuario")
+        if login_val:
+            self.username = str(login_val).strip()
+
+        pwd_raw = merged.get("password") or merged.get("senha")
+        if not pwd_raw and merged.get("senha_criptografada"):
+            try:
+                pwd_raw = decrypt_password(merged.get("senha_criptografada"))
+            except Exception:
+                pass
+        if pwd_raw:
+            self.password = str(pwd_raw).strip()
+
+        prest_val = (
+            merged.get("cod_prestador") or
+            merged.get("codigoPrestador") or
+            merged.get("prestador")
+        )
+        if prest_val:
+            self.cod_prestador = str(prest_val).strip()
+
+        return bool(self.username and self.password)
+
+    def _load_credentials(self, job_data=None):
         """
-        Busca credenciais na user_convenios (por user_id).
+        Busca credenciais via job_data ou na user_convenios (por user_id).
         """
         try:
-            if self.user_id:
+            if job_data and self._extract_credentials_from_dict(job_data):
+                self.log(f"Credenciais carregadas via job_data (user_id={self.user_id}, prestador={self.cod_prestador})")
+                return
+
+            if self.user_id and self.db:
                 user_conv = self.db.query(UserConvenio).filter(
                     UserConvenio.user_id == self.user_id,
                     UserConvenio.id_convenio == self.id_convenio
@@ -44,24 +86,22 @@ class IpasgoScraper(BaseScraper):
                     self.log(f"Credenciais carregadas de user_convenios (user_id={self.user_id}, prestador={self.cod_prestador})")
                     return
                 else:
-                    self.log(f"Registro user_convenios encontrado mas incompleto para user_id={self.user_id} e convenio={self.id_convenio}. Login={getattr(user_conv, 'login', 'N/A') if user_conv else 'NOT FOUND'}", level="ERROR")
+                    self.log(f"Registro user_convenios encontrado mas incompleto para user_id={self.user_id} e convenio={self.id_convenio}. Login={getattr(user_conv, 'login', 'N/A') if user_conv else 'NOT FOUND'}", level="WARN")
             else:
-                self.log(f"user_id nao fornecido ao scraper — nao foi possivel carregar credenciais", level="ERROR")
-            self.log(f"Credenciais nao encontradas em user_convenios para user_id={self.user_id} e convenio={self.id_convenio}", level="ERROR")
+                self.log(f"user_id nao fornecido ao scraper — nao foi possivel carregar credenciais", level="WARN")
+            self.log(f"Credenciais nao encontradas em user_convenios para user_id={self.user_id} e convenio={self.id_convenio}", level="WARN")
         except Exception as e:
             self.log(f"IPASGO Credential Load Error: {e}", level="ERROR")
 
-    def reload_credentials(self, user_id):
+    def reload_credentials(self, user_id, job_data=None):
         """
         Recarrega credenciais para um user_id diferente.
-        Chamado pelo server.py antes de processar cada job para garantir que
-        a sessão reutilizada do Chrome use as credenciais corretas do tenant.
         """
         self.user_id = user_id
         self.username = None
         self.password = None
         self.cod_prestador = None
-        self._load_credentials()
+        self._load_credentials(job_data)
 
     def start_driver(self):
         pass # Managed by SeleniumManager
@@ -141,6 +181,11 @@ class IpasgoScraper(BaseScraper):
                         job_data.update(parsed)
                 except Exception as e:
                     self.log(f"Failed to parse job params: {e}", level="WARN", job_id=job_id)
+
+        # Garantir extração de credenciais a partir do job_data/params mesclado (schema isolation)
+        self._extract_credentials_from_dict(job_data)
+        if not self.username or not self.password:
+            self._load_credentials(job_data)
 
         results = []
         error_msg = None

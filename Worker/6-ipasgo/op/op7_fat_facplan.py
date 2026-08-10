@@ -156,7 +156,12 @@ def run(scraper, job_data):
             
     scraper.log(f"OP7 Finalizada: {sucesso_count} sucessos, {erro_count} erros.", job_id=job_id)
     
+    status_str = "error" if erro_count > 0 else "success"
+    msg_str = f"OP7 Finalizada: {sucesso_count} sucessos, {erro_count} erros." if erro_count > 0 else "OP7 concluída com sucesso."
+
     return {
+        "status": status_str,
+        "message": msg_str,
         "itens_sucesso": [item.get("detalheId") for item in itens_batch if item.get("detalheId") not in [f["detalheId"] for f in failed_items]],
         "itens_erro": failed_items,
         "sucesso_count": sucesso_count,

@@ -182,8 +182,7 @@ def run(scraper, job_data):
     driver = scraper.driver
     job_id = job_data.get("job_id")
     
-    # Extração de parâmetros (com .strip() defensivo contra \r\n do frontend)
-    codigo_prestador = job_data.get("codigoPrestador", "").strip() or getattr(scraper, "cod_prestador", "")
+    codigo_prestador = job_data.get("codigoPrestador", "").strip() or job_data.get("cod_prestador", "").strip() or job_data.get("prestador", "").strip() or getattr(scraper, "cod_prestador", "")
     
     if not codigo_prestador:
         raise ValueError("O código do prestador não foi informado (payload vazio) e não foi encontrado na tabela user_convenios.")

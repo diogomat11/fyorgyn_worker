@@ -104,18 +104,18 @@ def process_job(job: JobRequest):
         scraper = ScraperFactory.get_scraper(job.id_convenio, db=db, headless=is_headless, user_id=job.user_id)
         scraper.driver = driver  # Inject driver
         
-        # 3. Force-reload credentials for this specific tenant job
-        # The scraper may be created fresh each time, but if job.user_id differs from what was
-        # set at __init__ time (e.g. due to module caching), reload_credentials ensures correctness.
-        if job.user_id and hasattr(scraper, 'reload_credentials'):
-            if getattr(scraper, 'user_id', None) != job.user_id or not getattr(scraper, 'username', None):
-                print(f">>> Reloading credentials for user_id={job.user_id} (scraper had user_id={getattr(scraper, 'user_id', None)})")
-                scraper.reload_credentials(job.user_id)
-        
-        # 3. Process
-        print(f">>> Starting routine {job.rotina}...")
+        # 3. Prepare job data payload
         job_data = job.model_dump()
         job_data["params"] = job.get_params_str()
+
+        # Force-reload credentials for this specific tenant job
+        if hasattr(scraper, 'reload_credentials'):
+            if getattr(scraper, 'user_id', None) != job.user_id or not getattr(scraper, 'username', None):
+                print(f">>> Reloading credentials for user_id={job.user_id} (scraper had user_id={getattr(scraper, 'user_id', None)})")
+                try:
+                    scraper.reload_credentials(job.user_id, job_data=job_data)
+                except TypeError:
+                    scraper.reload_credentials(job.user_id)
 
         if hasattr(scraper, 'process_job'):
              results = scraper.process_job(job.rotina, job_data)

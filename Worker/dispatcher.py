@@ -179,6 +179,28 @@ def retry_failed_jobs(db):
         if failed_jobs:
             logger.info(f"Retrying {len(failed_jobs)} failed jobs...")
             for job in failed_jobs:
+                if job.result_data:
+                    res_data = job.result_data or {}
+                    data_dict = res_data.get("data") if isinstance(res_data.get("data"), dict) else res_data
+                    itens_erro = data_dict.get("itens_erro") if isinstance(data_dict, dict) else None
+                    if itens_erro and isinstance(itens_erro, list):
+                        try:
+                            params_dict = dict(job.params or {})
+                            params_dict["itens"] = [
+                                {
+                                    "detalheId": item.get("detalheId"),
+                                    "status": item.get("status"),
+                                    "dataRealizacao": item.get("dataRealizacao"),
+                                    "valorProcedimento": item.get("valorProcedimento", "")
+                                }
+                                for item in itens_erro if isinstance(item, dict) and item.get("detalheId")
+                            ]
+                            job.params = params_dict
+                            from sqlalchemy.orm.attributes import flag_modified
+                            flag_modified(job, "params")
+                        except Exception as prune_e:
+                            logger.error(f"Erro ao podar params no retry_failed_jobs para job {job.id}: {prune_e}")
+
                 job.status = "pending"
                 job.locked_by = None
                 job.attempts = job.attempts or 0
@@ -515,6 +537,28 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 current_job.updated_at = datetime.now(timezone.utc)
                 err_msg = data.get("message") or data.get("detail") or "Unknown error from server"
                 
+                # Se o resultado contiver itens_erro, atualiza job.params["itens"] para apenas os que falharam
+                res_payload = data.get("data") if isinstance(data.get("data"), dict) else data
+                itens_erro = res_payload.get("itens_erro") if isinstance(res_payload, dict) else None
+                if itens_erro and isinstance(itens_erro, list):
+                    try:
+                        params_dict = dict(current_job.params or {})
+                        params_dict["itens"] = [
+                            {
+                                "detalheId": item.get("detalheId"),
+                                "status": item.get("status"),
+                                "dataRealizacao": item.get("dataRealizacao"),
+                                "valorProcedimento": item.get("valorProcedimento", "")
+                            }
+                            for item in itens_erro if isinstance(item, dict) and item.get("detalheId")
+                        ]
+                        current_job.params = params_dict
+                        from sqlalchemy.orm.attributes import flag_modified
+                        flag_modified(current_job, "params")
+                        logger.info(f"Job {job_id} params podados para conter apenas {len(params_dict['itens'])} itens com erro.")
+                    except Exception as prune_e:
+                        logger.error(f"Erro ao podar params do job {job_id}: {prune_e}")
+
                 # Regra de Negócio PO: Interromper Retentativas para erros Fatais (Carteira Inválida)
                 if "carteira inv" in err_msg.lower() or "dígito" in err_msg.lower() or "invalida" in err_msg.lower():
                     current_job.attempts = max(3, current_job.attempts or 0)

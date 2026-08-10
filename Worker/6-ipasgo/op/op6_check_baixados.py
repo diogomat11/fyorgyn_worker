@@ -22,7 +22,7 @@ def run(scraper, job_data):
     job_id = job_data.get("job_id")
     # Changed from loteId to numero_lote to match DB nomenclature
     numero_lote = job_data.get("numero_lote", job_data.get("loteId")) 
-    codigo_prestador = job_data.get("codigoPrestador", "") or getattr(scraper, "cod_prestador", "")
+    codigo_prestador = job_data.get("codigoPrestador", "").strip() or job_data.get("cod_prestador", "").strip() or job_data.get("prestador", "").strip() or getattr(scraper, "cod_prestador", "")
     
     if not codigo_prestador:
         raise ValueError("O código do prestador não foi informado (payload vazio) e não foi encontrado na tabela user_convenios.")
