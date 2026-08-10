@@ -1,11 +1,16 @@
 import os
 import sys
 import time
+import json
 from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from sqlalchemy.orm import Session
 from selenium.common.exceptions import TimeoutException
+try:
+    import requests as _requests_lib
+except ImportError:
+    _requests_lib = None
 
 _worker_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if _worker_root not in sys.path:
@@ -70,6 +75,65 @@ class UnimedScraper(BaseScraper):
             self.cod_prestador = str(prest_val).strip()
 
         return bool(self.username and self.password)
+
+    def login_http(self):
+        """
+        Realiza login no SGURCard via requests.Session (sem Selenium).
+        Usado pelas OPs que operam 100% via HTTP (ex: OP4).
+        Retorna a soup da página pós-login para extração de submenu/dynaHash.
+        """
+        import re
+        import html as html_mod
+        from bs4 import BeautifulSoup
+
+        if _requests_lib is None:
+            raise ImportError("[UnimedGoiania] 'requests' não instalado no ambiente.")
+
+        if not hasattr(self, 'session') or self.session is None:
+            self.session = _requests_lib.Session()
+
+        HEADERS = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "pt-BR,pt;q=0.9",
+        }
+        self.session.headers.update(HEADERS)
+
+        BASE = "https://sgucard.unimedgoiania.coop.br/cmagnet"
+        r = self.session.get(f"{BASE}/Login.do", timeout=30)
+        r.encoding = "iso-8859-1"
+        soup = BeautifulSoup(r.text, "html.parser")
+
+        form = soup.find("form", action=re.compile(r"Login\.do"))
+        if not form:
+            raise Exception("[UnimedGoiania HTTP] Form de login não encontrado.")
+
+        m = re.search(r'[?&]dynaHash=([a-f0-9]{32})', form.get("action", ""))
+        if not m:
+            raise Exception("[UnimedGoiania HTTP] dynaHash não encontrado no form de login.")
+        dyna = m.group(1)
+
+        payload = {
+            "ccsForm": "Login",
+            "LOGIN": self.username,
+            "SENHA": self.password,
+            "dynaHash": dyna,
+        }
+        r2 = self.session.post(
+            f"{BASE}/Login.do?ccsForm=Login&dynaHash={dyna}",
+            data=payload, timeout=30
+        )
+        r2.encoding = "iso-8859-1"
+
+        if "Sair" not in r2.text and "logout" not in r2.text.lower():
+            raise Exception(
+                "[UnimedGoiania HTTP] Login falhou — credenciais inválidas ou captcha ativo."
+            )
+        return BeautifulSoup(r2.text, "html.parser")
 
     def _load_credentials(self, job_data=None):
         try:
@@ -256,7 +320,12 @@ class UnimedScraper(BaseScraper):
                 elif str(rotina).lower() in ("execução", "execucao", "3", "op3_execucao"):
                     from op.op3_execucao import execute as op3_execute
                     results = op3_execute(self, job_data)
-                    
+
+                elif str(rotina).lower() in ("4", "op4_finalizados", "finalizados", "exames_finalizados"):
+                    # OP4 opera 100% via HTTP (requests.Session), sem Selenium.
+                    from op.op4_finalizados import execute as op4_execute
+                    results = op4_execute(self, job_data)
+
                 else:
                     raise NotImplementedError(f"Rotina '{rotina}' not implementada para Unimed Goiania")
                 
