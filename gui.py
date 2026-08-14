@@ -420,8 +420,14 @@ class SystemManagerApp:
                 if resp.status_code == 200:
                     data = resp.json()
                     w_key = data.get("worker_key", "—")
+                    max_srv = data.get("max_servers", 1)
+                    stagger = data.get("dispatch_stagger_seconds", 15)
+                    proc = data.get("tipo_processamento", "local")
+                    servers = data.get("servers", [])
+                    srv_desc = ", ".join([f"Srv#{s.get('server_num', i+1)} ({s.get('tipo_operacao', 'convenio')})" for i, s in enumerate(servers)]) if servers else f"{max_srv} servidor(es)"
                     self.var_worker_key.set(w_key)
                     self.log(f"Worker Key obtida: {w_key} (informe no login da Web)", "SUCCESS")
+                    self.log(f"Configurações do Worker: {max_srv} servidor(es) [{srv_desc}], Stagger: {stagger}s, Proc: {proc}", "INFO")
                 else:
                     self.log(f"Falha ao obter Worker Key ({resp.status_code}): {resp.text[:100]}", "WARN")
             except Exception as e:
