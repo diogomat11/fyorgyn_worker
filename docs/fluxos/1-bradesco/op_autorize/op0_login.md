@@ -1,5 +1,11 @@
 # OP0 - Login Polimed/Orizon (Bradesco)
 
+> **Classificação do Integrador:**
+> - **ID Integrador / Convênio:** `1`
+> - **Tipo de Operação:** `convenio`
+> - **Tipo de Processamento Padrão:** `local` (com `strict_session_affinity`)
+> - **Alocação no Worker:** Servidores Genéricos (Portas 9000 a 9004)
+
 ## Objetivo
 Autenticação no portal Polimed/Orizon para acesso às funcionalidades de autorização do Bradesco.
 

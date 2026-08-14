@@ -318,43 +318,37 @@ def start_heartbeat_loop(status_map, interval=10, cmd_queue=None, active_workers
 
 def _parse_server_urls(server_urls_str):
     """
-    Parse server URL configuration into a dict mapping url -> id_convenio list.
+    Parse server URL configuration into a dict mapping url -> config dict.
     
     Supported formats:
-      - Legacy (no convenio): "http://127.0.0.1:9000,http://127.0.0.1:9001"
-        -> All servers accept all jobs (backward compatible)
-      - New (with convenio): "http://127.0.0.1:9000:2,http://127.0.0.1:9001:2,http://127.0.0.1:9002:3"
-        -> Servers are filtered to only process jobs for their convenio
+      - Generic: "http://127.0.0.1:9000,http://127.0.0.1:9001"
+      - Convenio specific: "http://127.0.0.1:9000:2"
+      - Operacao type specific: "http://127.0.0.1:9005:agendamento"
     
-    Disambiguation: a standard http URL has exactly 2 colons (http: + host:port).
-    If there are 3 or more colons, the LAST segment is the convenio id.
-    
-    Returns: dict of {url: [id_convenio, ...] or None}
+    Returns: dict of {url: {"tipo_operacao": str|None, "convenio_ids": list|None}}
     """
     server_convenio_map = {}
     for entry in server_urls_str.split(","):
         entry = entry.strip()
         if not entry:
             continue
-        # Count colons. Standard http://host:port has exactly 2 colons.
-        # http://host:port:convenio_id has 3 colons.
         colon_count = entry.count(":")
         if colon_count >= 3:
-            # Has convenio suffix: split off the last segment
             url_part, last = entry.rsplit(":", 1)
-            if last.isdigit():
+            last_clean = last.lower()
+            if last_clean in ("agendamento", "convenio"):
+                server_convenio_map[url_part] = {"tipo_operacao": last_clean, "convenio_ids": None}
+            elif last.isdigit():
                 conv_id = int(last)
                 if url_part not in server_convenio_map:
-                    server_convenio_map[url_part] = []
-                server_convenio_map[url_part].append(conv_id)
+                    server_convenio_map[url_part] = {"tipo_operacao": None, "convenio_ids": []}
+                if isinstance(server_convenio_map[url_part].get("convenio_ids"), list):
+                    server_convenio_map[url_part]["convenio_ids"].append(conv_id)
             else:
-                # Malformed — treat as no convenio
-                server_convenio_map[entry] = None
+                server_convenio_map[entry] = {"tipo_operacao": None, "convenio_ids": None}
         else:
-            # Standard URL — no convenio suffix, accepts all jobs
-            server_convenio_map[entry] = None
+            server_convenio_map[entry] = {"tipo_operacao": None, "convenio_ids": None}
     return server_convenio_map
-
 
 
 def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=None, active_workers=None):
@@ -371,14 +365,18 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
     servers = list(server_convenio_map.keys())
     
     logger.info(f"Dispatcher configured with {len(servers)} server(s):")
-    for url, convs in server_convenio_map.items():
-        logger.info(f"  {url} -> convenios: {convs if convs else 'ALL'}")
+    for url, cfg in server_convenio_map.items():
+        tipo_op = cfg.get("tipo_operacao")
+        convs = cfg.get("convenio_ids")
+        desc = f"tipo_operacao: {tipo_op}" if tipo_op else f"convenios: {convs if convs else 'ALL GENERIC'}"
+        logger.info(f"  {url} -> {desc}")
 
     server_status_map = {
         url: {
             "status": "idle", 
             "last_job": None, 
-            "convenio_ids": server_convenio_map[url],
+            "convenio_ids": server_convenio_map[url].get("convenio_ids"),
+            "tipo_operacao": server_convenio_map[url].get("tipo_operacao"),
             "last_convenio_id": None,
             "last_user_id": None,
             "last_login": None
@@ -390,12 +388,6 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
     start_heartbeat_loop(server_status_map, cmd_queue=cmd_queue, active_workers=active_workers)
 
 
-
-
-
-    # Define call_server outside loop to avoid redefinition, but it needs access to server_status_map
-    # easier to keep it inside or pass map as arg. Let's pass map as arg or use closure here.
-    
     def call_server(url, job_id, carteirinha, carteirinha_id, id_convenio, rotina, params, status_map, user_id=None):
         db = SessionLocal()
         import json as _json
@@ -649,7 +641,25 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                     srv_cfg_map = {}
                 
                 def pick_server(job, idle_servers):
-                    """Pick the best idle server for this job using priority rules."""
+                    """Pick the best idle server for this job using priority rules and operation type isolation."""
+                    is_agendamento_job = (job.id_convenio in (100, 101))
+                    
+                    # Filter idle servers strictly by tipo_operacao
+                    candidate_servers = []
+                    for s in idle_servers:
+                        cfg_info = server_convenio_map.get(s, {})
+                        srv_tipo = cfg_info.get("tipo_operacao") if isinstance(cfg_info, dict) else None
+                        if is_agendamento_job:
+                            if srv_tipo == "agendamento":
+                                candidate_servers.append(s)
+                        else:
+                            if srv_tipo != "agendamento":
+                                candidate_servers.append(s)
+                                
+                    if not candidate_servers:
+                        return None
+
+                    idle_servers = candidate_servers
                     job_login = get_job_login(db, job)
                     
                     # Determine if strict session affinity should be enforced

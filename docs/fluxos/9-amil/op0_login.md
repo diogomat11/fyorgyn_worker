@@ -1,5 +1,11 @@
 # Fluxo Passo a Passo: Rotina 0 (Login) - Amil
 
+> **Classificação do Integrador:**
+> - **ID Integrador / Convênio:** `9`
+> - **Tipo de Operação:** `convenio`
+> - **Tipo de Processamento Padrão:** `local`
+> - **Alocação no Worker:** Servidores Genéricos (Portas 9000 a 9004)
+
 **Objetivo:** Autenticar o Scraper no portal da Amil.
 
 ## 1. Carregamento de Credenciais

@@ -1,5 +1,11 @@
 # Fluxo OP1 - Importar Agendamentos (ABA CLMF)
 
+> **Classificação do Integrador:**
+> - **ID Integrador / Convênio:** `101`
+> - **Tipo de Operação:** `agendamento`
+> - **Tipo de Processamento Padrão:** `local` / `server`
+> - **Alocação no Worker:** Servidores Exclusivos de Agendamento (Portas 9005 e 9006)
+
 Este documento descreve o funcionamento da OP1 (`op1_importar_agendamentos.py`), encarregada de extrair os agendamentos do sistema de origem e retornar ao Hub para atualização.
 
 ## Objetivo

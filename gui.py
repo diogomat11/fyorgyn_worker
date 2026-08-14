@@ -151,6 +151,7 @@ class SystemManagerApp:
         self.var_login = tk.StringVar()
         self.var_password = tk.StringVar()
         self.var_token = tk.StringVar()
+        self.var_worker_key = tk.StringVar(value="—")
         self.var_headless = tk.BooleanVar(value=True)
         self.var_autostart = tk.BooleanVar(value=False)
         
@@ -159,6 +160,7 @@ class SystemManagerApp:
         # UI Elements
         self.create_header()
         self.create_main_container()
+        self.register_worker_api()
         
         # Tray Support
         self.root.protocol('WM_DELETE_WINDOW', self.minimize_to_tray)
@@ -341,9 +343,9 @@ class SystemManagerApp:
         # Servers
         f_serv = ttk.Frame(pnl, style="Panel.TFrame")
         f_serv.pack(fill="x", pady=5)
-        ttk.Label(f_serv, text="Workers (1-4):").pack(side="left")
+        ttk.Label(f_serv, text="Workers (1-7):").pack(side="left")
         ttk.Label(f_serv, textvariable=self.var_num_servers, font=("Segoe UI", 10, "bold"), width=3).pack(side="left", padx=5)
-        s = ttk.Scale(f_serv, from_=1, to=5, orient="horizontal", variable=self.var_num_servers, command=lambda x: self.var_num_servers.set(int(float(x))))
+        s = ttk.Scale(f_serv, from_=1, to=7, orient="horizontal", variable=self.var_num_servers, command=lambda x: self.var_num_servers.set(int(float(x))))
         s.pack(side="left", fill="x", expand=True, padx=5)
         
         # Logins
@@ -357,11 +359,87 @@ class SystemManagerApp:
 
         ttk.Label(pnl, text="API Token:").pack(anchor="w")
         e_tok = ttk.Entry(pnl, textvariable=self.var_token, style="TEntry")
-        e_tok.pack(fill="x", pady=(0, 10))
+        e_tok.pack(fill="x", pady=(0, 5))
+        e_tok.bind("<FocusOut>", lambda e: self.register_worker_api())
+        e_tok.bind("<Return>", lambda e: self.register_worker_api())
+
+        # Worker Key Display Box for Login (Selectable + Copy Button)
+        f_wk = tk.Frame(pnl, bg=self.colors["panel"], pady=4)
+        f_wk.pack(fill="x", pady=(0, 10))
+        tk.Label(f_wk, text="Código do Worker (Login na Web):", bg=self.colors["panel"], fg=self.colors["accent"], font=("Segoe UI", 9, "bold")).pack(anchor="w")
+
+        f_entry = tk.Frame(f_wk, bg=self.colors["panel"])
+        f_entry.pack(fill="x", pady=2)
+
+        entry_wk = tk.Entry(
+            f_entry,
+            textvariable=self.var_worker_key,
+            bg="#0f172a",
+            fg="#06b6d4",
+            font=("Consolas", 11, "bold"),
+            justify="center",
+            relief="solid",
+            borderwidth=1,
+            state="readonly",
+            readonlybackground="#0f172a"
+        )
+        entry_wk.pack(side="left", fill="x", expand=True, ipady=4)
+
+        btn_copy = tk.Button(
+            f_entry,
+            text="📋 Copiar",
+            bg="#007acc",
+            fg="white",
+            font=("Segoe UI", 9, "bold"),
+            activebackground="#005999",
+            activeforeground="white",
+            borderwidth=0,
+            cursor="hand2",
+            padx=10,
+            command=self.copy_worker_key
+        )
+        btn_copy.pack(side="right", padx=(5, 0), fill="y")
         
         # Toggles
         ttk.Checkbutton(pnl, text="Headless Mode (Hidden Browser)", variable=self.var_headless).pack(anchor="w", pady=5)
         ttk.Checkbutton(pnl, text="Autostart with Windows", variable=self.var_autostart, command=lambda: self.set_autostart(self.var_autostart.get())).pack(anchor="w", pady=5)
+
+    def register_worker_api(self):
+        token = self.var_token.get().strip()
+        if not token:
+            self.var_worker_key.set("—")
+            return
+            
+        def _bg_register():
+            try:
+                backend_url = os.environ.get("BACKEND_API_URL", "http://127.0.0.1:8000/api")
+                endpoint = f"{backend_url.rstrip('/')}/workers/register"
+                hostname = socket.gethostname()
+                
+                resp = requests.post(endpoint, json={"api_key": token, "hostname": hostname}, timeout=5)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    w_key = data.get("worker_key", "—")
+                    self.var_worker_key.set(w_key)
+                    self.log(f"Worker Key obtida: {w_key} (informe no login da Web)", "SUCCESS")
+                else:
+                    self.log(f"Falha ao obter Worker Key ({resp.status_code}): {resp.text[:100]}", "WARN")
+            except Exception as e:
+                self.log(f"Erro ao registrar Worker via API Key: {e}", "WARN")
+
+        threading.Thread(target=_bg_register, daemon=True).start()
+
+    def copy_worker_key(self):
+        key = self.var_worker_key.get().strip()
+        if key and key != "—":
+            self.root.clipboard_clear()
+            self.root.clipboard_append(key)
+            self.root.update()
+            self.log(f"Código do Worker '{key}' copiado para a área de transferência!", "SUCCESS")
+        else:
+            self.log("Nenhum Código do Worker disponível para copiar.", "WARN")
+
+
 
     def create_control_panel(self, parent):
         pnl = ttk.Frame(parent, style="Panel.TFrame", padding=15)
@@ -404,7 +482,10 @@ class SystemManagerApp:
             f = tk.Frame(self.server_frame, bg="#333", padx=10, pady=8) # darker for card look
             f.pack(fill="x", pady=2)
             
-            tk.Label(f, text=f"Worker {i+1} (:{port})", bg="#333", fg="white", font=("Segoe UI", 9, "bold")).pack(side="left")
+            lbl_title = f"Worker {i+1} (:{port})"
+            if port in (9005, 9006):
+                lbl_title += " [AGD]"
+            tk.Label(f, text=lbl_title, bg="#333", fg="white", font=("Segoe UI", 9, "bold")).pack(side="left")
             status_lbl = tk.Label(f, text="OFFLINE", bg="#333", fg="#777", font=("Segoe UI", 8))
             status_lbl.pack(side="right")
             
@@ -532,6 +613,7 @@ class SystemManagerApp:
 
     def start_system(self):
         self.save_config()
+        self.register_worker_api()
         self.refresh_server_grid()
         
         if run_server is None or run_dispatcher is None:

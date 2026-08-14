@@ -2,7 +2,7 @@ import subprocess
 import os
 import time
 
-ports = [9000, 9001, 9002, 9003, 9004]
+ports = [9000, 9001, 9002, 9003, 9004, 9005, 9006]
 processes = []
 
 # Start each worker server
@@ -23,8 +23,13 @@ time.sleep(3)
 
 # Start dispatcher
 env_dispatcher = os.environ.copy()
-server_urls = ",".join(f"http://127.0.0.1:{p}" for p in ports)
-env_dispatcher["API_SERVER_URLS"] = server_urls
+server_urls_list = []
+for p in ports:
+    if p in (9005, 9006):
+        server_urls_list.append(f"http://127.0.0.1:{p}:agendamento")
+    else:
+        server_urls_list.append(f"http://127.0.0.1:{p}")
+env_dispatcher["API_SERVER_URLS"] = ",".join(server_urls_list)
 
 print("Starting dispatcher...")
 p_disp = subprocess.Popen(

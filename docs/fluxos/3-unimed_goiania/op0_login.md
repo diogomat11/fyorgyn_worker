@@ -1,5 +1,11 @@
 # Fluxo Passo a Passo: Rotina 0 (Login) - Unimed Goiânia
 
+> **Classificação do Integrador:**
+> - **ID Integrador / Convênio:** `3`
+> - **Tipo de Operação:** `convenio`
+> - **Tipo de Processamento Padrão:** `local`
+> - **Alocação no Worker:** Servidores Genéricos (Portas 9000 a 9004)
+
 **Objetivo:** Autenticar o Scraper no portal específico da Unimed Goiânia.
 
 ## 1. Carregamento de Credenciais

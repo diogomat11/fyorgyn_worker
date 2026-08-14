@@ -1,5 +1,11 @@
 # Fluxo Passo a Passo: Rotina 0 (Login) - Unimed Anápolis
 
+> **Classificação do Integrador:**
+> - **ID Integrador / Convênio:** `2`
+> - **Tipo de Operação:** `convenio`
+> - **Tipo de Processamento Padrão:** `local`
+> - **Alocação no Worker:** Servidores Genéricos (Portas 9000 a 9004)
+
 **Objetivo:** Autenticar um Scraper no portal da Unimed Anápolis e validar a presença de uma sessão ativa para realização das demais rotinas.
 
 ## 1. Carregamento de Credenciais

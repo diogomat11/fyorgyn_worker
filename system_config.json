@@ -1,8 +1,8 @@
 {
-    "num_servers": 5,
+    "num_servers": 7,
     "login": "REC2209525",
     "password": "Unimed@2025",
-    "token": "webscraping_api_token_2025",
+    "token": "wk_XqcKwSpSFElHOPNIRnLrDe9X",
     "headless": false,
     "autostart": false
 }
