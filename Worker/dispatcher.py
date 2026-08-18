@@ -628,7 +628,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 #   2. Server with matching server_config only
                 #   3. Server with matching last_convenio_id (session affinity) only
                 #   4. Any idle server (fallback)
-                ranked_jobs = get_ranked_pending_jobs(db, limit=len(available_servers) * 2)
+                ranked_jobs = get_ranked_pending_jobs(db, limit=300)
                 dispatched_servers = set()
                 
                 # Load server preference configs for this cycle
