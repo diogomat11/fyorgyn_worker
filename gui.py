@@ -154,6 +154,10 @@ class SystemManagerApp:
         self.var_worker_key = tk.StringVar(value="—")
         self.var_headless = tk.BooleanVar(value=True)
         self.var_autostart = tk.BooleanVar(value=False)
+
+        # Config de servers retornada pela API (/workers/register)
+        # Lista de {"server_num": N, "tipo_operacao": "convenio"|"agendamento"} ou None
+        self.api_servers = None
         
         self.load_config()
         
@@ -428,12 +432,32 @@ class SystemManagerApp:
                     self.var_worker_key.set(w_key)
                     self.log(f"Worker Key obtida: {w_key} (informe no login da Web)", "SUCCESS")
                     self.log(f"Configurações do Worker: {max_srv} servidor(es) [{srv_desc}], Stagger: {stagger}s, Proc: {proc}", "INFO")
+                    # Aplicar a configuração de servers retornada pela API na interface
+                    # (Tk não é thread-safe: agenda a atualização na main thread)
+                    self.api_servers = servers or None
+                    self.root.after(0, self._apply_api_server_config)
                 else:
                     self.log(f"Falha ao obter Worker Key ({resp.status_code}): {resp.text[:100]}", "WARN")
             except Exception as e:
                 self.log(f"Erro ao registrar Worker via API Key: {e}", "WARN")
 
         threading.Thread(target=_bg_register, daemon=True).start()
+
+    def _apply_api_server_config(self):
+        """Aplica a configuração de servers da API (quantidade e tipo por server) na GUI."""
+        if not self.api_servers:
+            return
+        try:
+            count = len(self.api_servers)
+            # Slider local suporta 1-7; clamp para evitar erro de IntVar
+            self.var_num_servers.set(max(1, min(7, count)))
+            self.refresh_server_grid()
+            if self.running:
+                self.log("Config de servers da API aplicada ao painel. Nova quantidade surtirá efeito no próximo START SYSTEM.", "WARN")
+            else:
+                self.log(f"Painel atualizado conforme API: {count} servidor(es).", "SUCCESS")
+        except Exception as e:
+            self.log(f"Erro ao aplicar config de servers da API: {e}", "ERROR")
 
     def copy_worker_key(self):
         key = self.var_worker_key.get().strip()
@@ -480,21 +504,31 @@ class SystemManagerApp:
     def refresh_server_grid(self):
         for w in self.server_frame.winfo_children(): w.destroy()
         self.status_widgets = {}
-        
-        count = self.var_num_servers.get()
-        # Responsive grid? Just clean rows
-        for i in range(count):
-            port = 9000 + i
+
+        # Monta a lista de servers: usa a config da API (quantidade + tipo por server)
+        # quando disponível; senão fallback no slider local.
+        if self.api_servers:
+            servers = [
+                (int(s.get("server_num", i + 1)), s.get("tipo_operacao", "convenio"))
+                for i, s in enumerate(self.api_servers)
+            ]
+        else:
+            servers = [(i + 1, None) for i in range(self.var_num_servers.get())]
+
+        for server_num, tipo_operacao in servers:
+            port = 9000 + server_num - 1
             f = tk.Frame(self.server_frame, bg="#333", padx=10, pady=8) # darker for card look
             f.pack(fill="x", pady=2)
-            
-            lbl_title = f"Worker {i+1} (:{port})"
-            if port in (9005, 9006):
+
+            lbl_title = f"Worker {server_num} (:{port})"
+            if tipo_operacao == "agendamento":
                 lbl_title += " [AGD]"
+            elif tipo_operacao == "convenio":
+                lbl_title += " [CONV]"
             tk.Label(f, text=lbl_title, bg="#333", fg="white", font=("Segoe UI", 9, "bold")).pack(side="left")
             status_lbl = tk.Label(f, text="OFFLINE", bg="#333", fg="#777", font=("Segoe UI", 8))
             status_lbl.pack(side="right")
-            
+
             self.status_widgets[port] = status_lbl
 
     def create_log_panel(self, parent):
@@ -629,7 +663,9 @@ class SystemManagerApp:
         # Prepare Env
         self.prepare_env()
         
-        num_w = self.var_num_servers.get()
+        # Quantidade de servers: prioriza a config da API (worker_api_keys.servers);
+        # fallback no slider local enquanto o registro não responder.
+        num_w = len(self.api_servers) if self.api_servers else self.var_num_servers.get()
         server_urls_annotated = []
         
         self.log(f"Initializing {num_w} worker(s)...")
@@ -684,8 +720,18 @@ class SystemManagerApp:
         for i in range(num_w):
             port = 9000 + i
             url = f"http://127.0.0.1:{port}"
-            # Use annotated URL from env if available (preserves :id_convenio suffix for dispatcher isolation)
-            annotated_url = env_port_map.get(port, url)
+            
+            # Prioritize tipo_operacao from API servers config
+            tipo_op = None
+            if self.api_servers and i < len(self.api_servers):
+                tipo_op = self.api_servers[i].get("tipo_operacao")
+            
+            if tipo_op:
+                annotated_url = f"{url}:{tipo_op}"
+            else:
+                # Use annotated URL from env if available (preserves :id_convenio suffix for dispatcher isolation)
+                annotated_url = env_port_map.get(port, url)
+                
             server_urls_annotated.append(annotated_url)
             
             # Kill existing if any (cleanup)

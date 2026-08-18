@@ -642,7 +642,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 
                 def pick_server(job, idle_servers):
                     """Pick the best idle server for this job using priority rules and operation type isolation."""
-                    is_agendamento_job = (job.id_convenio in (100, 101))
+                    is_agendamento_job = (job.id_convenio in (100, 101) or getattr(job, "tipo_operacao", None) == "agendamento")
                     
                     # Filter idle servers strictly by tipo_operacao
                     candidate_servers = []
