@@ -42,6 +42,74 @@ BACKEND_API_URL = os.environ.get("BACKEND_API_URL", "http://localhost:8000")
 HOSTNAME = socket.gethostname()
 
 
+# ── Resolução data-driven de tipo_operacao (plano integradores agendamento, D7) ──
+# Substitui o hardcode `job.id_convenio in (100, 101)` pela cadeia
+# convenios.id_integrador → worker.integradores.tipo_operacao (cache TTL 5min).
+_TIPO_OPERACAO_TTL = 300.0
+_TIPO_OPERACAO_CACHE = {"map": {}, "expires": 0.0}
+_ROTINAS_ATIVAS_CACHE = {"map": {}, "expires": 0.0}
+
+
+def _mapa_tipo_operacao(db):
+    """{id_convenio: tipo_operacao} via convenios.id_integrador → worker.integradores.
+    Cache em memória; falha de query → mantém cache anterior (ou {} no 1º ciclo)."""
+    now = time.time()
+    if _TIPO_OPERACAO_CACHE["map"] and now < _TIPO_OPERACAO_CACHE["expires"]:
+        return _TIPO_OPERACAO_CACHE["map"]
+    try:
+        from models import Convenio, WorkerIntegrador
+        convs = db.query(Convenio.id_convenio, Convenio.id_integrador).filter(
+            Convenio.id_integrador.isnot(None)).all()
+        ints = {i.id_integrador: i.tipo_operacao for i in db.query(WorkerIntegrador).all()}
+        mapa = {c[0]: (ints.get(c[1]) or "convenio") for c in convs}
+        _TIPO_OPERACAO_CACHE["map"] = mapa
+        _TIPO_OPERACAO_CACHE["expires"] = now + _TIPO_OPERACAO_TTL
+    except Exception as e:
+        logger.warning(f"[tipo_operacao] falha ao recarregar mapeamento (usando cache/legado): {e}")
+    return _TIPO_OPERACAO_CACHE["map"]
+
+
+def _is_job_agendamento(db, job):
+    """Job pertence a integrador tipo 'agendamento'? (fallback degradado: legado)."""
+    mapa = _mapa_tipo_operacao(db)
+    if not mapa:
+        return job.id_convenio in (100, 101)
+    return mapa.get(job.id_convenio) == "agendamento"
+
+
+def _rotinas_ativas_por_integrador(db):
+    """{id_integrador: set(rotinas ativas)} do catálogo worker.integrador_operacoes (TTL 5min)."""
+    now = time.time()
+    if _ROTINAS_ATIVAS_CACHE["map"] and now < _ROTINAS_ATIVAS_CACHE["expires"]:
+        return _ROTINAS_ATIVAS_CACHE["map"]
+    try:
+        from models import WorkerIntegradorOperacao
+        mapa = {}
+        for op in db.query(WorkerIntegradorOperacao).filter(
+                WorkerIntegradorOperacao.ativo == True).all():  # noqa: E712
+            mapa.setdefault(op.id_integrador, set()).add(op.rotina)
+        _ROTINAS_ATIVAS_CACHE["map"] = mapa
+        _ROTINAS_ATIVAS_CACHE["expires"] = now + _TIPO_OPERACAO_TTL
+    except Exception as e:
+        logger.warning(f"[rotinas_ativas] falha ao recarregar catálogo (usando cache): {e}")
+    return _ROTINAS_ATIVAS_CACHE["map"]
+
+
+def _rotina_ativa_integrador(db, job):
+    """Guarda de catálogo (camada 3): rotina registrada/ativa para o integrador do job.
+    Sem catálogo carregado ou convênio sem integrador → não bloquear (degradado)."""
+    rotinas = _rotinas_ativas_por_integrador(db)
+    if not rotinas:
+        return True
+    from models import Convenio
+    conv = db.query(Convenio.id_integrador).filter(
+        Convenio.id_convenio == job.id_convenio).first()
+    if not conv or not conv[0]:
+        return True
+    ativas = rotinas.get(conv[0])
+    return bool(ativas) and job.rotina in ativas
+
+
 
 
 class QueueLogger:
@@ -642,7 +710,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 
                 def pick_server(job, idle_servers):
                     """Pick the best idle server for this job using priority rules and operation type isolation."""
-                    is_agendamento_job = (job.id_convenio in (100, 101) or getattr(job, "tipo_operacao", None) == "agendamento")
+                    is_agendamento_job = _is_job_agendamento(db, job)
                     
                     # Filter idle servers strictly by tipo_operacao
                     candidate_servers = []
@@ -773,6 +841,26 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                     server_url = pick_server(job, idle)
                     if server_url is None:
                         logger.info(f"Skipping job {job.id}: Strict session affinity enforced (Server Busy)")
+                        continue
+
+                    # ── Guarda de catálogo (camada 3): integradores tipo agendamento
+                    #    só despacham rotinas ativas no catálogo worker (fail-fast,
+                    #    sem consumir servidor Selenium com job inválido) ──
+                    if _is_job_agendamento(db, job) and not _rotina_ativa_integrador(db, job):
+                        job.status = "error"
+                        job.error_message = (
+                            f"Rotina '{job.rotina}' não registrada/ativa no catálogo do integrador "
+                            f"(convênio {job.id_convenio})."
+                        )
+                        db.add(Log(
+                            job_id=job.id,
+                            user_id=job.user_id,
+                            carteirinha_id=job.carteirinha_id,
+                            level="ERROR",
+                            message=job.error_message
+                        ))
+                        db.commit()
+                        logger.error(f"Job {job.id} rejeitado pela guarda de catálogo: {job.error_message}")
                         continue
                     
                     # --- Anti double-dispatch: row-level lock ---

@@ -215,6 +215,7 @@ class Convenio(Base):
 
     id_convenio = Column(Integer, primary_key=True, index=True)
     nome = Column(Text, nullable=False)
+    id_integrador = Column(Integer, nullable=True)  # mapeamento 1:N convênio→integrador (espaço W, migration 0092)
     digitos_carteirinha = Column(Integer, nullable=True)
     biometria = Column(Boolean, default=False)
     timeout_captura = Column(Boolean, default=False)

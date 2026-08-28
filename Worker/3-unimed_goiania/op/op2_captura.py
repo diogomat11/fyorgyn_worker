@@ -386,6 +386,7 @@ def execute(scraper, job_data):
     carteirinha_db_id = job_data.get("carteirinha_id")
 
     numero_guia = None
+    guia_multiprestador = False
     try:
         params_str = job_data.get("params")
         if params_str:
@@ -395,6 +396,9 @@ def execute(scraper, job_data):
                 guias_list = params_obj.get("guias", [])
                 if isinstance(guias_list, list) and len(guias_list) > 0:
                     numero_guia = str(guias_list[0])
+            # Flag multiprestador do convenio (convenios.guias_multiprestador, injetada
+            # pelo Hub nos params): guia capturada por outro prestador nao e exibida no portal.
+            guia_multiprestador = bool(params_obj.get("guias_multiprestador", False))
     except (json.JSONDecodeError, AttributeError):
         pass
 
@@ -432,6 +436,23 @@ def execute(scraper, job_data):
     captured = _do_new_exame_capture(scraper, carteirinha, numero_guia, job_id)
 
     if not captured:
+        # Multiprestador: no portal Unimed a guia capturada por outro cod_prestador
+        # simplesmente NAO e exibida para os demais (getErrosSapia so detecta
+        # inexistencia). Nesse caso, retornar status proprio (o Hub criara JOB de
+        # consulta) em vez de falhar a rotina com PermanentError.
+        if guia_multiprestador:
+            scraper.log(
+                f"Guia {numero_guia} nao localizada/exibida no portal - possivelmente "
+                f"capturada por outro prestador (multiprestador).",
+                level="WARN", job_id=job_id
+            )
+            return [{
+                "numero_guia": numero_guia,
+                "status": "Capturada por outro prestador",
+                "detalhe": "Guia nao localizada/exibida no portal (multiprestador): "
+                           "possivelmente capturada por outro cod_prestador ou inexistente.",
+                "multiprestador": True
+            }]
         raise ValueError(f"PermanentError: Guia {numero_guia} não localizada na tabela de guias. Captura não realizada.")
 
     scraper.log(f"FASE 4: PÓS-FILTRO — Confirmando captura da guia {numero_guia}...", job_id=job_id)

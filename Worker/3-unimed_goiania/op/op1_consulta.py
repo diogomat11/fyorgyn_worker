@@ -48,6 +48,10 @@ def execute(scraper, job_data):
     # Se ausente, o worker nao filtra/marca guias por procedimento.
     procedimentos_habilitados = job_data.get("procedimentos_habilitados")
 
+    # Prazo PEI (dias) recebido do Hub via params (convenios.prazo_pei_dias).
+    # Define o cutoff de paginacao de guias antigas; default historico 270.
+    prazo_pei_dias = job_data.get("prazo_pei_dias") or 270
+
     # Acumulador de validacao de vinculo de prestador por guia.
     valida_guias = {}
 
@@ -201,7 +205,7 @@ def execute(scraper, job_data):
                         except:
                             guia_date = datetime.datetime.now().date()
                         
-                        cutoff_date = datetime.datetime.now().date() - datetime.timedelta(days=270)
+                        cutoff_date = datetime.datetime.now().date() - datetime.timedelta(days=prazo_pei_dias)
                         if guia_date < cutoff_date:
                             scraper.log(f"Guia date {date_text} is older than limit. Stopping.", job_id=job_id, carteirinha_id=carteirinha_db_id)
                             scraper.driver.close()

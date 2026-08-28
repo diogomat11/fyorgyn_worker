@@ -74,15 +74,24 @@ Este documento serve como um guia para o QA tester validar as rotinas de cada co
 - [ ] Acesso ao portal Unimed Goiânia (cookies validados).
 
 ### Op1 - Consulta
-- [ ] Filtro por data (até 270 dias) funcionando.
+- [ ] Filtro por data funcionando com prazo configurável (`params.prazo_pei_dias` do convênio; default do worker 270 dias — ajustável em Gestão de Convênios → "Prazo PEI (dias)").
 - [ ] Identificação de guias pendentes.
+- [ ] Ao alterar o prazo do convênio no painel, o próximo job usa o novo cutoff (validar nos logs do worker).
 
 ### Op2 - Captura
 - [ ] Abertura do popup de detalhes da guia.
 - [ ] Extração de XML/Dados completa.
+- [ ] **Multiprestador (2026-08-15):** com guia capturada por OUTRO `cod_prestador` (não exibida no portal), o job NÃO falha — retorna `status: "Capturada por outro prestador"`; o painel Importações exibe o badge "⚠ Capturada por outro prestador" e o Hub cria automaticamente job de consulta (`consulta_guias`) para a carteirinha.
+- [ ] **Sem multiprestador (flag desligada):** guia não localizada → `PermanentError` (comportamento antigo preservado).
 
 ### Op3 - Execução
 - [ ] Fluxo de finalização de guia no portal concluído.
+
+### Sistema / Painel (2026-08-15)
+- [ ] **Cron carteirinhas** (Gestão de Integradores → Agendamentos): "Executar agora" no integrador 3 cria jobs `op1_consulta` para carteirinhas ativas (conferir em Importações); toggle e horário persistem após reload.
+- [ ] **GUI local**: após registrar a API key, o painel de servers reflete quantidade e tipos (`[CONV]`/`[AGD]`) vindos da API; START SYSTEM sobe a quantidade correta.
+- [ ] **Edit Worker** (Gestão de Integradores → Workers): salvar edição fecha o modal, recarrega a listagem e NÃO exibe página em branco.
+- [ ] **Corpo Clínico**: abas Profissionais|Médicos filtram corretamente; modal Vínculos salva áreas/convênios/procedimentos/usuários e reflete após reload.
 
 ---
 
