@@ -33,6 +33,7 @@ if sys.stderr is None: sys.stderr = FileLogStream("dispatcher_err.log")
 # Use local Worker modules (independent of backend)
 from database import SessionLocal
 from models import Job, Log, PriorityRule
+from sqlalchemy.orm import defer
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -183,7 +184,12 @@ def get_ranked_pending_jobs(db, limit=20):
         
         ParentJob = aliased(Job)
         
-        pending_jobs = db.query(Job).outerjoin(
+        pending_jobs = db.query(Job).options(
+            # Egress: não transferir params/result_data no poll de ranking —
+            # params é lazy-load por job apenas quando necessário (affinity/dispatch).
+            defer(Job.params),
+            defer(Job.result_data)
+        ).outerjoin(
             ParentJob, Job.depending_id == ParentJob.id
         ).filter(
             Job.status == "pending",
@@ -374,12 +380,16 @@ def send_heartbeat(status_map, cmd_queue=None, active_workers=None):
     except Exception as e:
         logger.error(f"Heartbeat Loop Error: {e}")
 
-def start_heartbeat_loop(status_map, interval=10, cmd_queue=None, active_workers=None):
+def start_heartbeat_loop(status_map, interval=None, cmd_queue=None, active_workers=None):
+    # Egress: heartbeat de 10s gerava ~2 SELECT+UPDATE no Supabas a cada batida por
+    # frota. 30s default (env HEARTBEAT_INTERVAL) mantém liveness/comandos restart.
+    if interval is None:
+        interval = int(os.environ.get("HEARTBEAT_INTERVAL", "30"))
     def loop():
         while True:
             send_heartbeat(status_map, cmd_queue, active_workers)
             time.sleep(interval)
-    
+
     t = threading.Thread(target=loop, daemon=True)
     t.start()
 
