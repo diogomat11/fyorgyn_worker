@@ -645,7 +645,8 @@ class SystemManagerApp:
     # --- System Logic ---
 
     def prepare_env(self):
-        os.environ["BACKEND_API_URL"] = "http://127.0.0.1:8000/api"
+        # Preserva a URL do .env (produção); localhost é só fallback de dev.
+        os.environ.setdefault("BACKEND_API_URL", "http://127.0.0.1:8000/api")
         os.environ["SGUCARD_LOGIN"] = self.var_login.get()
         os.environ["SGUCARD_PASSWORD"] = self.var_password.get()
         os.environ["SGUCARD_HEADLESS"] = "true" if self.var_headless.get() else "false"
