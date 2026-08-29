@@ -416,12 +416,39 @@ class SystemManagerApp:
             
         def _bg_register():
             try:
-                backend_url = os.environ.get("BACKEND_API_URL", "http://127.0.0.1:8000/api")
-                endpoint = f"{backend_url.rstrip('/')}/workers/register"
+                # Cadeia de hubs: produção (BACKEND_API_URL) → fallback local
+                # (BACKEND_API_URL_FALLBACK). 5xx/recusado no Render (free dorme)
+                # cai para o backend local quando este estiver ativo.
+                urls = []
+                for var, default in (("BACKEND_API_URL", "http://127.0.0.1:8000/api"),
+                                     ("BACKEND_API_URL_FALLBACK", "http://127.0.0.1:8000/api")):
+                    u = os.environ.get(var, default).rstrip('/')
+                    if u and u not in urls:
+                        urls.append(u)
+
                 hostname = socket.gethostname()
-                
-                resp = requests.post(endpoint, json={"api_key": token, "hostname": hostname}, timeout=5)
+                resp, usado = None, None
+                for base in urls:
+                    try:
+                        r = requests.post(f"{base}/workers/register",
+                                          json={"api_key": token, "hostname": hostname}, timeout=10)
+                        if r.status_code < 500:
+                            resp, usado = r, base
+                            break
+                        self.log(f"Hub {base} indisponível (HTTP {r.status_code}) — tentando fallback...",
+                                 "WARN")
+                    except Exception as ex:
+                        self.log(f"Hub {base} inacessível ({ex.__class__.__name__}) — tentando fallback...",
+                                 "WARN")
+
+                if resp is None:
+                    self.log("Registro falhou: produção E fallback local indisponíveis. "
+                             "Se o Render estiver acordando (free), aguarde ~1 min e tente novamente.", "ERROR")
+                    return
+
                 if resp.status_code == 200:
+                    if usado != urls[0]:
+                        self.log(f"Registro concluído via FALLBACK local ({usado})", "WARN")
                     data = resp.json()
                     w_key = data.get("worker_key", "—")
                     max_srv = data.get("max_servers", 1)

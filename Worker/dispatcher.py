@@ -43,6 +43,41 @@ BACKEND_API_URL = os.environ.get("BACKEND_API_URL", "http://localhost:8000")
 HOSTNAME = socket.gethostname()
 
 
+# ── Fallback de hub (2026-08-29): Render free dorme (503/recusado) — tentar a
+#    produção primeiro e cair para um backend local quando este estiver ativo. ──
+def _hub_bases():
+    """Bases do hub SEM o sufixo /api, em ordem de preferência."""
+    bases = []
+    for var, default in (("BACKEND_API_URL", "http://localhost:8000"),
+                         ("BACKEND_API_URL_FALLBACK", "http://127.0.0.1:8000")):
+        b = os.environ.get(var, default).rstrip('/')
+        if b.endswith('/api'):
+            b = b[:-4]
+        if b and b not in bases:
+            bases.append(b)
+    return bases
+
+
+def post_hub(path, json=None, timeout=10):
+    """POST {path} (COM prefixo /api) no hub, com fallback produção → local.
+
+    Retorna (resp, base_usada); resp=None quando todos os destinos falharam.
+    Respostas 4xx são válidas (não caem para o fallback); 5xx e erros de
+    conexão acionam o próximo destino."""
+    ultimo = None
+    for base in _hub_bases():
+        try:
+            r = requests.post(f"{base}{path}", json=json, timeout=timeout)
+            if r.status_code < 500:
+                return r, base
+            ultimo = f"HTTP {r.status_code}"
+            logger.warning(f"[hub-fallback] {base}{path} -> HTTP {r.status_code}")
+        except Exception as e:
+            ultimo = e.__class__.__name__
+            logger.warning(f"[hub-fallback] {base}{path} inacessível: {ultimo}")
+    return None, None
+
+
 # ── Resolução data-driven de tipo_operacao (plano integradores agendamento, D7) ──
 # Substitui o hardcode `job.id_convenio in (100, 101)` pela cadeia
 # convenios.id_integrador → worker.integradores.tipo_operacao (cache TTL 5min).
@@ -362,8 +397,9 @@ def send_heartbeat(status_map, cmd_queue=None, active_workers=None):
             }
             
             try:
-                resp = requests.post(f"{BACKEND_API_URL}/workers/heartbeat", json=payload, timeout=5)
-                # ...
+                resp, _base_usado = post_hub("/api/workers/heartbeat", json=payload, timeout=5)
+                if resp is None:
+                    raise Exception(f"hub indisponível (produção e fallback local)")
                 data = resp.json()
                 
                 if data.get("command") == "restart":
@@ -576,18 +612,16 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                         db.commit()
                         
                         try:
-                            base_api = str(BACKEND_API_URL).rstrip('/')
-                            if base_api.endswith('/api'):
-                                base_api = base_api[:-4]
-                            webhook_url = f"{base_api}/api/jobs/{job_id}/result"
-                            logger.info(f"Sending webhook to {webhook_url}")
-                            webhook_resp = requests.post(webhook_url, json=data, timeout=30)
-                            if webhook_resp.status_code == 200:
+                            webhook_resp, _base_usado = post_hub(f"/api/jobs/{job_id}/result", json=data, timeout=30)
+                            if webhook_resp is not None and webhook_resp.status_code == 200:
                                 db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="INFO",
                                            message=f"Webhook enviado e processado pelo backend com sucesso."))
-                            else:
+                            elif webhook_resp is not None:
                                 db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="WARN",
                                            message=f"Backend retornou status {webhook_resp.status_code} no webhook. O processamento ocorrerá via sync service em background."))
+                            else:
+                                db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="WARN",
+                                           message="Hub indisponível (produção e fallback local) ao enviar webhook. O processamento ocorrerá via sync service em background."))
                             db.commit()
                         except Exception as webhook_err:
                             logger.error(f"Erro ao enviar webhook ao backend: {webhook_err}")
