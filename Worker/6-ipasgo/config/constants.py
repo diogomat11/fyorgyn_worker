@@ -37,8 +37,12 @@ X_IMPORT_ALERT_SUCESSO = '//*[contains(@class, "alert-success")]'
 X_IMPORT_ALERT_ERRO = '//*[contains(@class, "alert-danger") or contains(@class, "alert-error")]'
 X_ALERT_CLOSE = '//*[contains(@class,"close") or contains(@class,"fechar") or contains(@class,"fa-times") or @id="alertClose" or @aria-label="Fechar"]'
 # Link que abre módulo principal (FacPlan) em nova aba
-X_FACPLAN_LINK = '//*[contains(@href, "facplan") or contains(@href, "webplan") or contains(., "FacPlan") or contains(., "FACPLAN") or contains(., "WebPlan") or contains(., "Webplan")]'
-X_FACPLAN_LINK_ABS = '/html/body/form/div[3]/div/div[4]/div/div[2]/div/div/span/div[6]/div/div[2]/div[2]/div/div/div[2]/table/tbody/tr[2]/td/div/a'
+# NOTA: escopo //a — sem ele o //*[contains(...)] casa os ANCESTRAIS do link
+# (divs/tabela) primeiro e o clique vai para o elemento errado.
+X_FACPLAN_LINK = '//a[contains(@href, "facplan") or contains(@href, "FacPlan") or contains(@href, "webplan") or contains(@href, "WebPlan") or contains(., "FacPlan") or contains(., "FACPLAN") or contains(., "WebPlan") or contains(., "Webplan")]'
+# Absoluto pós-fechamento do frame de notificação (DOM reorganiza div[4]→div[2],
+# div[6]→div[7]) — atualizado em 2026-08-29
+X_FACPLAN_LINK_ABS = '/html/body/form/div[3]/div/div[2]/div/div[2]/div/div/span/div[7]/div/div[2]/div[2]/div/div/div[2]/table/tbody/tr[2]/td/div/a'
 
 
 # ===========================
