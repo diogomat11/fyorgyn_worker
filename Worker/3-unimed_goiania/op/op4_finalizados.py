@@ -30,6 +30,89 @@ from selenium.webdriver.common.by import By
 # HTTP no fim — o dispatcher expira em 600s e o resultado se perde.
 OP4_CHUNK_SIZE = max(1, int(os.environ.get("OP4_CHUNK_SIZE", "200")))
 
+# Fetch do detalhe via HTTP (requests) reutilizando os cookies do Chrome:
+# ~0.3–0.6s/guia contra ~2s/guia do driver.get. Qualquer falha cai para o
+# caminho Selenium original (resiliente, com recuperação de sessão).
+OP4_HTTP_SLEEP = float(os.environ.get("OP4_HTTP_SLEEP", "0.25"))
+OP4_HTTP_TIMEOUT = float(os.environ.get("OP4_HTTP_TIMEOUT", "15"))
+_UA_FALLBACK = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36")
+
+
+def _invalidate_http_session(scraper):
+    """Descarta a sessão HTTP (após re-login as cookies do portal mudam)."""
+    try:
+        if getattr(scraper, "_op4_http", None):
+            scraper._op4_http.close()
+    except Exception:
+        pass
+    scraper._op4_http = None
+    scraper._op4_http_ua = None
+
+
+def _get_http_session(scraper):
+    """requests.Session sincronizada com os cookies do Chrome ativo."""
+    import requests as _requests
+
+    sess = getattr(scraper, "_op4_http", None)
+    if sess is None:
+        sess = _requests.Session()
+        ua = getattr(scraper, "_op4_http_ua", None)
+        if not ua:
+            try:
+                ua = scraper.driver.execute_script("return navigator.userAgent;")
+            except Exception:
+                ua = None
+        sess.headers.update({
+            "User-Agent": ua or _UA_FALLBACK,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+            "Referer": "https://sgucard.unimedgoiania.coop.br/cmagnet/exames/sadt/finalizadas.do",
+        })
+        scraper._op4_http = sess
+    # Re-sincroniza cookies a cada chamada (barato; portal pode rotacionar)
+    try:
+        for ck in scraper.driver.get_cookies():
+            sess.cookies.set(ck["name"], ck["value"], domain=ck.get("domain") or None)
+    except Exception:
+        _invalidate_http_session(scraper)
+        return None
+    return sess
+
+
+def _looks_like_detalhe(html_str: str) -> bool:
+    """Marcadores positivos da página de detalhe (login/erro não têm)."""
+    if not html_str:
+        return False
+    h = html_str[:60000]
+    return ("labelinfo" in h) or ("MagnetoDataTD" in h)
+
+
+def _http_fetch_detalhe(scraper, url: str):
+    """
+    Busca o HTML de detalhe via HTTP rápido. Retorna o HTML ou None
+    (falha/expiração → chamador usa o fallback Selenium).
+    """
+    try:
+        sess = _get_http_session(scraper)
+        if sess is None:
+            return None
+        r = sess.get(url, timeout=OP4_HTTP_TIMEOUT, allow_redirects=True)
+        if r.status_code == 200 and _looks_like_detalhe(r.text):
+            return r.text
+        # Sessão pode ter expirado (login/redirect): re-sincroniza e tenta 1x
+        _invalidate_http_session(scraper)
+        sess = _get_http_session(scraper)
+        if sess is None:
+            return None
+        r2 = sess.get(url, timeout=OP4_HTTP_TIMEOUT, allow_redirects=True)
+        if r2.status_code == 200 and _looks_like_detalhe(r2.text):
+            return r2.text
+        return None
+    except Exception:
+        _invalidate_http_session(scraper)
+        return None
+
 
 def _parse_date_br(val) -> "date | None":
     """'18/09/2026' -> date (ou None)."""
@@ -140,6 +223,8 @@ def _recover_driver_session(scraper, job_id, s_dt_ini, s_dt_fim, s_nr_guia):
     Re-inicia o driver, realiza login, navega até Exames Finalizados e re-aplica o filtro.
     """
     scraper.log("[OP4] 🔄 Conexão com o robô perdida! Re-iniciando navegador e recuperando sessão...", level="WARN", job_id=job_id)
+    # Re-login troca os cookies do portal: sessão HTTP rápida fica inválida
+    _invalidate_http_session(scraper)
     try:
         if scraper.driver:
             try: scraper.driver.quit()
@@ -625,27 +710,45 @@ def execute(scraper, job_data: dict) -> list:
         detalhe_full = urllib.parse.urljoin(base_page_url, detalhe_href)
         scraper.log(f"[OP4] Detalhe {i}/{total_guias} — guia {guia['guia']} (cd={cd_guia})", job_id=job_id)
 
-        # 1. Checar saúde do driver antes da requisição
+        # 1. Checar saúde do driver antes da requisição (o fallback depende dele)
         if not _is_driver_alive(scraper.driver):
             _recover_driver_session(scraper, job_id, s_dt_ini, s_dt_fim, s_nr_guia)
 
-        # 2. Tentar obter a página de detalhe com retry/recuperação
+        # 2. Obter o HTML do detalhe: HTTP rápido (cookies do Chrome) com
+        #    fallback Selenium resiliente (retry + recuperação de sessão).
+        detalhe = None
         fetched_ok = False
-        for attempt in range(1, 3):
+
+        html_fast = _http_fetch_detalhe(scraper, detalhe_full)
+        if html_fast is not None:
             try:
-                scraper.driver.get(detalhe_full)
-                time.sleep(1.0)
-                detalhe = _parse_detalhe(scraper.driver.page_source, guia)
-                results.append(detalhe)
-                chunk_buffer.append(detalhe)
+                detalhe = _parse_detalhe(html_fast, guia)
                 fetched_ok = True
-                break
-            except Exception as err_item:
-                scraper.log(
-                    f"[OP4] Tentativa {attempt}/2 falhou para guia {guia['guia']} (Item {i}/{total_guias}): {err_item}. Tentando recuperar sessão...",
-                    level="WARN", job_id=job_id
-                )
-                _recover_driver_session(scraper, job_id, s_dt_ini, s_dt_fim, s_nr_guia)
+            except Exception as parse_http_err:
+                scraper.log(f"[OP4] Parse do HTTP falhou para guia {guia['guia']} "
+                            f"({parse_http_err}); usando Selenium.", level="WARN", job_id=job_id)
+                detalhe = None
+        if fetched_ok:
+            time.sleep(OP4_HTTP_SLEEP)
+
+        if not fetched_ok:
+            for attempt in range(1, 3):
+                try:
+                    scraper.driver.get(detalhe_full)
+                    time.sleep(1.0)
+                    detalhe = _parse_detalhe(scraper.driver.page_source, guia)
+                    fetched_ok = True
+                    break
+                except Exception as err_item:
+                    scraper.log(
+                        f"[OP4] Tentativa {attempt}/2 falhou para guia {guia['guia']} (Item {i}/{total_guias}): {err_item}. Tentando recuperar sessão...",
+                        level="WARN", job_id=job_id
+                    )
+                    _recover_driver_session(scraper, job_id, s_dt_ini, s_dt_fim, s_nr_guia)
+
+        if fetched_ok and detalhe is not None:
+            results.append(detalhe)
+            chunk_buffer.append(detalhe)
 
         if not fetched_ok:
             scraper.log(f"[OP4] Falha definitiva no detalhe da guia {guia['guia']} (Item {i}). Usando fallback.", level="WARN", job_id=job_id)
