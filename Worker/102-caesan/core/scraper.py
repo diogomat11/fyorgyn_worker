@@ -1,0 +1,264 @@
+import os
+import sys
+import importlib.util
+from datetime import datetime
+import json
+import time
+
+# ── Isolate Environment (Ensure base imports from Worker/ root) ──
+_worker_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _worker_root not in sys.path:
+    sys.path.insert(0, _worker_root)
+
+from base_scraper import BaseScraper
+from models import JobExecution, UserConvenio
+from security_utils import decrypt_password
+from database import SessionLocal
+
+
+class CaesanScraper(BaseScraper):
+    """
+    Integrador CAESAN (id_integrador=102 — rotinas pertencem ao integrador).
+    Jobs chegam com id_convenio do convênio mapeado (ex.: 16) e, a partir do
+    envelope da ponte, com params["id_integrador"]=102.
+    """
+
+    def __init__(self, id_convenio=16, db=None, headless=True, user_id=None):
+        super().__init__(id_convenio, db, headless, user_id)
+        self.db = db if db else SessionLocal()
+        self.user_id = user_id
+        self.username = None
+        self.password = None
+        self.cod_prestador = None
+        self.module_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 102-caesan root
+        # Metadados da sessão extraída na OP0 (nomes de cookies apenas — nada sensível em logs)
+        self.session_meta = None
+
+    def _extract_credentials_from_dict(self, data_dict):
+        if not data_dict or not isinstance(data_dict, dict):
+            return False
+
+        params = data_dict.get("params")
+        if isinstance(params, str):
+            try:
+                params = json.loads(params)
+            except Exception:
+                params = None
+
+        merged = {}
+        merged.update(data_dict)
+        if isinstance(params, dict):
+            merged.update(params)
+
+        login_val = merged.get("login") or merged.get("username") or merged.get("usuario")
+        if login_val:
+            self.username = str(login_val).strip()
+
+        pwd_raw = merged.get("password") or merged.get("senha")
+        if not pwd_raw and merged.get("senha_criptografada"):
+            try:
+                pwd_raw = decrypt_password(merged.get("senha_criptografada"))
+            except Exception:
+                pass
+        if pwd_raw:
+            self.password = str(pwd_raw).strip()
+
+        prest_val = (
+            merged.get("cod_prestador") or
+            merged.get("codigoPrestador") or
+            merged.get("prestador")
+        )
+        if prest_val:
+            self.cod_prestador = str(prest_val).strip()
+
+        return bool(self.username and self.password)
+
+    def _load_credentials(self, job_data=None):
+        """Busca credenciais via job_data ou na user_convenios (por user_id × convenio)."""
+        try:
+            if job_data and self._extract_credentials_from_dict(job_data):
+                self.log(f"Credenciais carregadas via job_data (user_id={self.user_id}, prestador={self.cod_prestador})")
+                return
+
+            if self.user_id and self.db:
+                user_conv = self.db.query(UserConvenio).filter(
+                    UserConvenio.user_id == self.user_id,
+                    UserConvenio.id_convenio == self.id_convenio
+                ).first()
+                if user_conv and user_conv.login and user_conv.senha_criptografada:
+                    self.username = user_conv.login
+                    self.password = decrypt_password(user_conv.senha_criptografada)
+                    self.cod_prestador = user_conv.cod_prestador
+                    self.log(f"Credenciais carregadas de user_convenios (user_id={self.user_id}, prestador={self.cod_prestador})")
+                    return
+                self.log(
+                    f"Registro user_convenios encontrado mas incompleto para user_id={self.user_id} e convenio={self.id_convenio}. "
+                    f"Login={getattr(user_conv, 'login', 'N/A') if user_conv else 'NOT FOUND'}",
+                    level="WARN"
+                )
+            else:
+                self.log("user_id nao fornecido ao scraper — nao foi possivel carregar credenciais", level="WARN")
+        except Exception as e:
+            self.log(f"CAESAN Credential Load Error: {e}", level="ERROR")
+
+    def reload_credentials(self, user_id, job_data=None):
+        """Recarrega credenciais para um user_id diferente."""
+        self.user_id = user_id
+        self.username = None
+        self.password = None
+        self.cod_prestador = None
+        self._load_credentials(job_data)
+
+    def start_driver(self):
+        pass  # Managed by SeleniumManager
+
+    def close_driver(self):
+        pass  # Managed by SeleniumManager
+
+    def log(self, message, level="INFO", job_id=None, carteirinha_id=None):
+        job_prefix = f"[Job {job_id}] " if job_id else ""
+        print(f"[{level}] {job_prefix}{message}")
+        if self.db:
+            try:
+                from models import Log as LogModel
+                log_entry = LogModel(
+                    job_id=job_id,
+                    carteirinha_id=carteirinha_id,
+                    user_id=self.user_id,
+                    level=level,
+                    message=f"[CAESAN] {message}"
+                )
+                self.db.add(log_entry)
+                self.db.commit()
+            except Exception:
+                try:
+                    self.db.rollback()
+                except Exception:
+                    pass
+
+    def login(self):
+        """Executa a rotina OP0 (login)."""
+        return self.execute_op("op0_login", {"job_id": "internal_login"})
+
+    def execute_op(self, op_name, job_data):
+        """Carregador e executor genérico de OP (padrão importlib do projeto)."""
+        op_path = os.path.join(self.module_path, "op", f"{op_name}.py")
+        if not os.path.exists(op_path):
+            raise FileNotFoundError(f"Operação {op_name} não encontrada em {op_path}")
+
+        spec = importlib.util.spec_from_file_location(op_name, op_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        func = getattr(module, "run", None) or getattr(module, "execute", None)
+        if not func:
+            raise AttributeError(f"Módulo {op_name} não possui função 'run' ou 'execute'")
+        return func(self, job_data)
+
+    def process_job(self, rotina, job_data):
+        job_id = job_data.get("job_id") or job_data.get("id")
+        start_time = datetime.now()
+
+        execution = JobExecution(
+            job_id=job_id,
+            id_convenio=self.id_convenio,
+            rotina=str(rotina),
+            status="processing",
+            start_time=start_time
+        )
+        self.db.add(execution)
+        try:
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            self.log(f"Failed to record execution start: {e}", level="ERROR", job_id=job_id)
+
+        # Merge params (JSONB dict ou string legada)
+        params_raw = job_data.get("params")
+        if params_raw:
+            if isinstance(params_raw, dict):
+                job_data.update(params_raw)
+            elif isinstance(params_raw, str):
+                try:
+                    parsed = json.loads(params_raw)
+                    if isinstance(parsed, dict):
+                        job_data.update(parsed)
+                except Exception as e:
+                    self.log(f"Failed to parse job params: {e}", level="WARN", job_id=job_id)
+
+        self._extract_credentials_from_dict(job_data)
+        if not self.username or not self.password:
+            self._load_credentials(job_data)
+
+        results = []
+        error_msg = None
+        error_cat = "scraper_error"
+
+        # Rotinas pertencem ao integrador 102; aliases numéricos legados aceitos
+        op_map = {
+            "0": "op0_login",
+            "1": "op1_autorizacao",
+            "2": "op2_consultar_guia",
+            "login": "op0_login",
+            "autorizacao": "op1_autorizacao",
+            "autorização": "op1_autorizacao",
+            "consultar": "op2_consultar_guia",
+        }
+
+        op_name = op_map.get(str(rotina))
+        if not op_name:
+            if str(rotina).startswith("op"):
+                op_name = str(rotina)
+            else:
+                op_name = f"op{rotina}"
+
+        for attempt in range(self.max_retries):
+            try:
+                # Checagem de sessão: fora do domínio CAESAN → relogin
+                need_login = attempt > 0
+                if not need_login:
+                    try:
+                        url = self.driver.current_url if self.driver else "data:,"
+                        if url.startswith("data:") or "login" in url.lower() or "caesan" not in url.lower():
+                            need_login = True
+                    except Exception:
+                        need_login = True
+
+                if need_login:
+                    if not self.driver or getattr(self.driver, 'session_id', None) is None:
+                        try:
+                            from server import sel_manager
+                            self.driver = sel_manager.get_driver(self.id_convenio, headless=self.headless, user_id=self.user_id)
+                        except Exception as pool_err:
+                            self.log(f"Using isolated driver mode: {pool_err}", level="WARN", job_id=job_id)
+                    self.login()
+
+                results = self.execute_op(op_name, job_data)
+
+                execution.status = "success"
+                break
+            except Exception as e:
+                error_msg = str(e)
+                self.log(f"Attempt {attempt+1} failed: {error_msg}", level="ERROR", job_id=job_id)
+                if attempt < self.max_retries - 1:
+                    time.sleep(5)
+                else:
+                    execution.status = "error"
+
+        execution.end_time = datetime.now()
+        execution.duration_seconds = int((execution.end_time - start_time).total_seconds())
+        execution.items_found = len(results) if isinstance(results, list) else 1
+
+        if execution.status != "success":
+            execution.error_message = error_msg[:1000] if error_msg else "Unknown Error"
+            execution.error_category = error_cat
+
+        try:
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+
+        if execution.status == "error":
+            raise Exception(f"Job failed internally: {error_msg}")
+
+        return results

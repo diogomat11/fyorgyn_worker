@@ -331,10 +331,12 @@ def cleanup_expired_captures(db):
 def recover_stuck_jobs(db):
     try:
         from datetime import timedelta
-        # If a job is 'processing' for more than 15 minutes, the Generic Worker thread 
-        # or Chrome must have entirely died (e.g. OOM Kills, MaxClients crashes) without 
-        # reaching the final block to unlock it.
-        threshold = datetime.now(timezone.utc) - timedelta(minutes=15)
+        # Jobs 'processing' sem heartbeat (updated_at) por mais de STUCK_JOB_MINUTES
+        # provavelmente morreram sem finalizar (OOM/crash). O default alto (180 min)
+        # acomoda jobs longos de scraping (OP4 ≈ 2h40m para 5k+ guias) — jobs vivos
+        # renovam updated_at via heartbeat do worker (chunks do OP4 / _bump_job_heartbeat).
+        stuck_minutes = int(os.environ.get("STUCK_JOB_MINUTES", "180") or 180)
+        threshold = datetime.now(timezone.utc) - timedelta(minutes=stuck_minutes)
         stuck_jobs = db.query(Job).filter(
             Job.status == "processing",
             Job.updated_at < threshold
@@ -487,13 +489,15 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
 
     server_status_map = {
         url: {
-            "status": "idle", 
-            "last_job": None, 
+            "status": "idle",
+            "last_job": None,
             "convenio_ids": server_convenio_map[url].get("convenio_ids"),
             "tipo_operacao": server_convenio_map[url].get("tipo_operacao"),
             "last_convenio_id": None,
             "last_user_id": None,
-            "last_login": None
+            "last_login": None,
+            "awaiting_worker": None,     # job cujo HTTP expirou mas o worker segue rodando
+            "busy_cooldown_until": 0.0,  # 409 recebido: aguardar antes de re-oferecer
         } for url in servers
     }
     dispatch_stagger_val = stagger
@@ -505,6 +509,11 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
     def call_server(url, job_id, carteirinha, carteirinha_id, id_convenio, rotina, params, status_map, user_id=None):
         db = SessionLocal()
         import json as _json
+        # Timeout de leitura NÃO significa falha do job: o worker segue
+        # processando e agora finaliza/entrega o resultado por conta própria
+        # (heartbeat + chunks OP4 + _finalize_job_row). O job permanece
+        # 'processing' e o slot é liberado por reconciliação no loop principal.
+        worker_still_running = False
         try:
             params_dict = params if isinstance(params, dict) else (_json.loads(params) if params else {})
             
@@ -557,6 +566,9 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="WARN", message="Worker Port returned 409 Busy -> Retornando Job para fila Pending."))
                 current_job.updated_at = datetime.now(timezone.utc)
                 db.commit()
+                # Cooldown do slot: evitar re-oferecer jobs ao mesmo worker a cada
+                # ciclo (loop de ~16s) enquanto ele processa algo longo.
+                status_map[url]["busy_cooldown_until"] = time.time() + 60
                 return
 
             if data.get("status") == "success":
@@ -679,6 +691,21 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
             
             db.commit()
             
+        except requests.exceptions.Timeout:
+            # Read/Connect Timeout: o worker provavelmente AINDA está executando
+            # (jobs longos, ex. OP4 com 5k+ guias ≈ horas, vs timeout HTTP de 600s).
+            # NÃO marcar erro — o worker é agora dono do estado do job (heartbeat
+            # via chunks e finalização direta no banco). O slot permanece 'busy'
+            # e a reconciliação do loop principal o libera conforme o job avança.
+            worker_still_running = True
+            try:
+                db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id,
+                           level="WARN",
+                           message=("Dispatcher: timeout de leitura aguardando o worker (job possivelmente longo). "
+                                    "Job mantido como 'processing'; worker fará a entrega/finalização por conta própria.")))
+                db.commit()
+            except: pass
+            logger.warning(f"[dispatcher] Timeout aguardando worker {url} para job {job_id}; mantendo job em processing.")
         except requests.exceptions.ConnectionError:
             # Expected if the worker slot is physically offline right now
             try:
@@ -703,7 +730,15 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
             except: pass
         finally:
             db.close()
-            status_map[url]["status"] = "idle"
+            if worker_still_running:
+                # Mantém o slot ocupado até a reconciliação confirmar o fim do job
+                status_map[url]["status"] = "busy"
+                status_map[url]["awaiting_worker"] = job_id
+            else:
+                status_map[url]["status"] = "idle"
+                # Limpar só depois de marcar idle: o heartbeat só envia current_job_id
+                # quando status=="busy", então nunca reporta um job já finalizado.
+                status_map[url]["last_job"] = None
 
     while True:
         db = SessionLocal()
@@ -713,9 +748,38 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
             recover_stuck_jobs(db)
             cleanup_expired_captures(db)
 
-            # 1. Check available servers
+            # 1. Reconciliar slots 'busy' cujo HTTP expirou (awaiting_worker):
+            #    o worker segue rodando e é dono do estado do job. Libera o slot
+            #    quando o job chega ao fim (success/error) ou quando o heartbeat
+            #    (updated_at) fica stale — worker morreu sem finalizar.
+            for url, meta in server_status_map.items():
+                awaiting_job = meta.get("awaiting_worker")
+                if meta["status"] != "busy" or not awaiting_job:
+                    continue
+                try:
+                    jb = db.query(Job.status, Job.updated_at).filter(Job.id == awaiting_job).first()
+                    finished = (not jb) or jb[0] in ("success", "error")
+                    stale = False
+                    if jb and jb[1]:
+                        updated = jb[1] if jb[1].tzinfo else jb[1].replace(tzinfo=timezone.utc)
+                        stale = (datetime.now(timezone.utc) - updated) > timedelta(minutes=15)
+                    if finished or stale:
+                        if finished:
+                            logger.info(f"[reconcile] Job {awaiting_job} finalizado ({jb[0] if jb else 'sumido'}); liberando slot {url}")
+                        else:
+                            logger.warning(f"[reconcile] Job {awaiting_job} sem heartbeat >15min no slot {url}; liberando slot (worker presumido morto)")
+                        meta["awaiting_worker"] = None
+                        meta["status"] = "idle"
+                        meta["last_job"] = None
+                        db.commit()
+                except Exception as reconcile_e:
+                    logger.warning(f"[reconcile] Falha ao reconciliar slot {url} (job {awaiting_job}): {reconcile_e}")
+
+            # 2. Check available servers
             available_servers = []
             for url, meta in server_status_map.items():
+                if meta.get("busy_cooldown_until", 0) and time.time() < meta["busy_cooldown_until"]:
+                    continue
                 if meta["status"] != "idle":
                     continue
                 try:
@@ -947,6 +1011,7 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                         continue
                     
                     server_status_map[server_url]["status"] = "busy"
+                    server_status_map[server_url]["last_job"] = locked_job.id
                     server_status_map[server_url]["last_convenio_id"] = locked_job.id_convenio
                     server_status_map[server_url]["last_user_id"] = locked_job.user_id
                     server_status_map[server_url]["last_login"] = get_job_login(db, locked_job)

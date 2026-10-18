@@ -21,8 +21,8 @@
    - Objetivo: Forçar o descendente (mais novo em cima).
 
 3. **Loop de Varredura Visual Paginada:**
-   - Varre `tr` após `tr`. Confirma através da label contida em `/td[6]/span` (com o texto puro na prop text="Autorizado") se a guia é executável.
-   - Ponto Diferencial: Verifica corte de Tempo de Vida esticado para as GUIAS autorizadas via `[1]` data HTML. Guias anteriores a marca limite de `"270"` (duzentos e setenta) **Dias** forçam Break e Parada total no sistema (Não captura, cancela script da guia corrente e volta para Menu). 
+   - Varre `tr` após `tr`. Confirma através da label contida em `/td[6]/span` (com o texto puro na tag text="Autorizado") se a guia é executável.
+   - **Corte de Tempo de Vida (configurável desde 2026-08-15):** verifica pela data em `/td[1]` se a guia é anterior ao **cutoff** = `hoje - params.prazo_pei_dias` (prazo PEI do convênio, migrado de `convenios.prazo_pei_dias` e injetado pelo Hub; default do worker quando ausente: **270 dias**). Guias anteriores à marca forçam Break e Parada total (não captura, cancela o script da guia corrente e volta para o Menu).
    - A extração aprofundada ocorre adentrando no hiperlink (`td[4]/a`), baixando dados detalhados (data, senha autorizada, código da Carga). 
    - Desvia das armadilhas da Tabela que fecham a Popup precocemente com um fall-back em JS `history.go(-1)`.
 

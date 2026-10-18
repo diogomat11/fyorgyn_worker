@@ -3,6 +3,8 @@ Independent database connection for Worker
 Connects directly to Supabase without depending on backend code
 """
 import os
+from urllib.parse import urlsplit
+
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -12,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(os.getcwd(), '.env'))
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
-load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', 'backend', '.env'), override=True)
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', 'backend', '.env'))
 
 DB_USER = os.getenv("SUPABASE_DB_USER", "postgres")
 DB_PASSWORD = os.getenv("SUPABASE_PASSWORD", "")
@@ -20,19 +22,23 @@ DB_HOST = os.getenv("SUPABASE_DB_HOST", "db.ourddwzetcbdjnbvamgj.supabase.co")
 DB_PORT = os.getenv("SUPABASE_DB_PORT", "5432")
 DB_NAME = os.getenv("SUPABASE_DB_NAME", "postgres")
 
-if DB_HOST and "supabase.co" in DB_HOST and DB_PASSWORD:
-    SQLALCHEMY_DATABASE_URL = f"postgresql://postgres:{DB_PASSWORD}@{DB_HOST}:5432/{DB_NAME}"
+# Prefer DATABASE_URL when explicitly set: it points to the Supabase POOLER
+# (IPv4), required because the direct host db.<ref>.supabase.co is IPv6-only
+# and times out on IPv4-only networks. Force port 5432 (session mode), safe
+# for SQLAlchemy ORM. Falls back to the SUPABASE_DB_* variables otherwise.
+_DATABASE_URL_ENV = os.getenv("DATABASE_URL", "").strip()
+if _DATABASE_URL_ENV:
+    SQLALCHEMY_DATABASE_URL = _DATABASE_URL_ENV.replace(":6543", ":5432")
 else:
-    SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
-    if not SQLALCHEMY_DATABASE_URL:
-        SQLALCHEMY_DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-    if SQLALCHEMY_DATABASE_URL and ":6543" in SQLALCHEMY_DATABASE_URL:
-        SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace(":6543", ":5432")
+    if DB_PORT == "6543":
+        DB_PORT = "5432"  # transaction mode -> session mode
+    SQLALCHEMY_DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 try:
+    _parsed = urlsplit(SQLALCHEMY_DATABASE_URL)
     with open("db_debug_worker.log", "a") as f:
-        f.write(f"DB URL: {SQLALCHEMY_DATABASE_URL}\n")
-except: pass
+        f.write(f"DB URL: {_parsed.scheme}://{_parsed.username}@{_parsed.hostname}:{_parsed.port or 5432}/{_parsed.path.lstrip('/')}\n")
+except Exception: pass
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,

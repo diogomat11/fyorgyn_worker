@@ -102,13 +102,23 @@ def process_job(job: JobRequest):
         
         driver = sel_manager.get_driver(job.id_convenio, headless=is_headless, user_id=job.user_id)
         
-        # 2. Get Scraper Instance (generic — determined by job.id_convenio)
-        scraper = ScraperFactory.get_scraper(job.id_convenio, db=db, headless=is_headless, user_id=job.user_id)
-        scraper.driver = driver  # Inject driver
-        
-        # 3. Prepare job data payload
+        # 2. Prepare job data payload (antes do factory: o envelope pode carregar
+        #    o id_integrador que resolve o pacote do integrador no Local_worker)
         job_data = job.model_dump()
         job_data["params"] = job.get_params_str()
+
+        id_integrador = None
+        try:
+            _p = job.params if isinstance(job.params, dict) else (_json.loads(job.params) if job.params else {})
+            if isinstance(_p, dict):
+                id_integrador = _p.get("id_integrador")
+        except Exception:
+            id_integrador = None
+
+        # 3. Get Scraper Instance (resolvido por id_integrador do envelope;
+        #    fallback legado por id_convenio para jobs antigos sem carimbo)
+        scraper = ScraperFactory.get_scraper(job.id_convenio, db=db, headless=is_headless, user_id=job.user_id, id_integrador=id_integrador)
+        scraper.driver = driver  # Inject driver
 
         # Force-reload credentials for this specific tenant job
         if hasattr(scraper, 'reload_credentials'):

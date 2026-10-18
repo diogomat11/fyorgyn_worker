@@ -14,6 +14,7 @@ if _mod_root not in sys.path:
     sys.path.insert(0, _mod_root)
 
 from core.webplan_client import WebPlanClient
+from core.historico_observacoes import normalizar_historico
 from config.constants import (
     X_LOCALIZAR_NOTY_CONTAINER,
     X_LOCALIZAR_NOTY_FECHAR,
@@ -366,5 +367,48 @@ def run(scraper, job_data):
         
     scraper.log(f"OP11 - Extração concluída. Total de linhas (guia+procedimento): {len(todas_guias_extraidas)}", job_id=job_id)
     
+    # ══════════════════════════════════════════════════════════════════════
+    # 4. Histórico de Observações — apenas para guias NÃO autorizadas
+    #
+    # Guias pendentes no regulador (ex.: 'Aguardando documentação') podem ter
+    # observações da auditoria do IPASGO. O histórico alimenta o tooltip da aba
+    # Solicitações; guias autorizadas saem da fila e não precisam dele.
+    # ══════════════════════════════════════════════════════════════════════
+    estados_aprovados_set = set(["Autorizado", "Liberado", "Parcialmente autorizada"])
+    guias_pendentes = {}
+    for g in todas_guias_extraidas:
+        if str(g.get("status_guia") or "").strip() not in estados_aprovados_set and g.get("numero_guia"):
+            chave = (str(g["numero_guia"]), str(g.get("guia_prestador") or ""))
+            guias_pendentes.setdefault(chave, None)
+
+    if guias_pendentes:
+        scraper.log(
+            f"OP11 - Buscando histórico de observações de {len(guias_pendentes)} guia(s) não autorizada(s)...",
+            job_id=job_id
+        )
+        for (guia_num, guia_prest) in guias_pendentes:
+            if not guia_prest:
+                continue  # endpoint exige NumeroGuiaPrestador
+            try:
+                historico_raw = client.get_historico_observacao(guia_num, guia_prest)
+                guias_pendentes[(guia_num, guia_prest)] = normalizar_historico(historico_raw)
+                scraper.log(
+                    f"OP11 - Histórico guia {guia_num}: {len(guias_pendentes[(guia_num, guia_prest)])} observação(ões)",
+                    job_id=job_id
+                )
+            except Exception as hist_err:
+                scraper.log(
+                    f"OP11 - Falha ao buscar histórico da guia {guia_num} (segue sem histórico): {hist_err}",
+                    level="WARN", job_id=job_id
+                )
+            time.sleep(0.3)  # respiro entre consultas por guia
+
+        for g in todas_guias_extraidas:
+            if str(g.get("status_guia") or "").strip() in estados_aprovados_set:
+                continue
+            chave = (str(g.get("numero_guia") or ""), str(g.get("guia_prestador") or ""))
+            historico = guias_pendentes.get(chave)
+            if historico:
+                g["historico_observacoes"] = historico
     
     return todas_guias_extraidas

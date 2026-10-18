@@ -3,6 +3,8 @@ import time
 import json
 import logging
 
+from core.historico_observacoes import build_historico_param
+
 class WebPlanClient:
     def __init__(self, driver, referer_url=None):
         """
@@ -325,6 +327,131 @@ class WebPlanClient:
                 return data
             except Exception as e:
                 logging.error(f"Erro no CancelarLote: {e}")
+                if attempt == 2:
+                    raise e
+                time.sleep(3)
+
+    # ── Histórico de Observações do regulador (OP11 leitura / OP15 justificativa) ──
+
+    def _localizar_headers(self):
+        return {
+            "X-Requested-With": "XMLHttpRequest",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Referer": "https://novowebplanipasgo.facilinformatica.com.br/GuiasTISS/LocalizarProcedimentos"
+        }
+
+    def get_historico_observacao(self, numero_guia_operadora, numero_guia_prestador):
+        """
+        OP11 - GET do histórico de observações da guia no regulador.
+
+        O endpoint recebe os números da guia embutidos em Base64 no query param
+        `param` (padding '=' é URL-encoded pelo requests) e um cache-buster `_`.
+        Retorna a lista crua do portal (parse/normalização em core.historico_observacoes).
+        """
+        url = "https://novowebplanipasgo.facilinformatica.com.br/LocalizarProcedimentos/GetHistoricoObservacao"
+        params = {
+            "param": build_historico_param(numero_guia_operadora, numero_guia_prestador),
+            "_": int(time.time() * 1000),
+        }
+
+        for attempt in range(3):
+            try:
+                resp = self.session.get(
+                    url, params=params, headers=self._localizar_headers(), timeout=60
+                )
+                if 'text/html' in resp.headers.get('Content-Type', ''):
+                    raise ValueError(
+                        f"Sessão Rejeitada no GetHistoricoObservacao (Retornou HTML). "
+                        f"Status: {resp.status_code}. URL: {resp.url}"
+                    )
+                resp.raise_for_status()
+                data = resp.json()
+                if isinstance(data, str):
+                    data = json.loads(data)
+                return data if isinstance(data, list) else []
+            except Exception as e:
+                logging.error(
+                    f"Erro no GetHistoricoObservacao (guia {numero_guia_operadora}): {e}"
+                )
+                if attempt == 2:
+                    raise e
+                time.sleep(3)
+
+    def post_guia_etapa_final_regulacao(self, numero_guia_operadora, numero_guia_prestador):
+        """
+        OP15 - POST que verifica se a guia está na etapa final do regulamento.
+        Chamada prévia ao AddHistoricoObservacao (mesma sequência do portal).
+        """
+        url = "https://novowebplanipasgo.facilinformatica.com.br/LocalizarProcedimentos/GetGuiaEstaNaEtapaFinalDoRegulacao"
+
+        headers = self._localizar_headers()
+        headers["Content-Type"] = "application/x-www-form-urlencoded"
+
+        payload = {
+            "numeroGuiaOperadora": str(numero_guia_operadora),
+            "numeroGuiaPrestador": str(numero_guia_prestador),
+        }
+
+        for attempt in range(3):
+            try:
+                resp = self.session.post(url, headers=headers, data=payload, timeout=60)
+                if 'text/html' in resp.headers.get('Content-Type', ''):
+                    raise ValueError(
+                        f"Sessão Rejeitada no GetGuiaEstaNaEtapaFinalDoRegulacao (Retornou HTML). "
+                        f"Status: {resp.status_code}. URL: {resp.url}"
+                    )
+                resp.raise_for_status()
+                data = resp.json()
+                if isinstance(data, str):
+                    data = json.loads(data)
+                if isinstance(data, dict) and data.get("HasError", False):
+                    raise ValueError(f"API Error GetGuiaEstaNaEtapaFinalDoRegulacao: {data.get('ErrorMessage')}")
+                return data
+            except Exception as e:
+                logging.error(f"Erro no GetGuiaEstaNaEtapaFinalDoRegulacao (guia {numero_guia_operadora}): {e}")
+                if attempt == 2:
+                    raise e
+                time.sleep(3)
+
+    def post_add_historico_observacao(
+        self, numero_guia_operadora, numero_guia_prestador, observacao,
+        libera_pendente_doc=True, libera_auditoria_operadora=False,
+        libera_aguardando_beneficiario=False,
+    ):
+        """
+        OP15 - POST que inclui uma observação/justificativa na guia no regulador.
+        """
+        url = "https://novowebplanipasgo.facilinformatica.com.br/LocalizarProcedimentos/AddHistoricoObservacao"
+
+        headers = self._localizar_headers()
+        headers["Content-Type"] = "application/json;charset=UTF-8"
+
+        payload = {
+            "NumeroGuiaOperadora": str(numero_guia_operadora),
+            "NumeroGuiaPrestador": str(numero_guia_prestador),
+            "Observacao": str(observacao),
+            "LiberaPendenteDoc": bool(libera_pendente_doc),
+            "LiberaAuditoriaOperadora": bool(libera_auditoria_operadora),
+            "LiberaAguardandoBeneficiario": bool(libera_aguardando_beneficiario),
+        }
+
+        for attempt in range(3):
+            try:
+                resp = self.session.post(url, headers=headers, json=payload, timeout=60)
+                if 'text/html' in resp.headers.get('Content-Type', ''):
+                    raise ValueError(
+                        f"Sessão Rejeitada no AddHistoricoObservacao (Retornou HTML). "
+                        f"Status: {resp.status_code}. URL: {resp.url}"
+                    )
+                resp.raise_for_status()
+                data = resp.json()
+                if isinstance(data, str):
+                    data = json.loads(data)
+                if isinstance(data, dict) and data.get("HasError", False):
+                    raise ValueError(f"API Error AddHistoricoObservacao: {data.get('ErrorMessage')}")
+                return data
+            except Exception as e:
+                logging.error(f"Erro no AddHistoricoObservacao (guia {numero_guia_operadora}): {e}")
                 if attempt == 2:
                     raise e
                 time.sleep(3)

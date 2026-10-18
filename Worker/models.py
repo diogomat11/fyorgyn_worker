@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, DateTime, Time, ForeignKey, Text, Float, Boolean, JSON, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Date, DateTime, Time, ForeignKey, Text, Float, Boolean, JSON, UniqueConstraint, Index, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -42,7 +42,9 @@ class User(Base):
 class Carteirinha(Base):
     __tablename__ = "carteirinhas"
     __table_args__ = (
-        UniqueConstraint('carteirinha', 'user_id', name='uq_carteirinha_user_id'),
+        # Migration 0110: unicidade por (carteirinha, convenio, user); NULL tratado como 0
+        # (mesma carteirinha pode existir em convênios distintos — itens sem relação entre si)
+        Index('uq_carteirinha_conv_user', 'carteirinha', text('COALESCE(id_convenio, 0)'), 'user_id', unique=True),
         {'extend_existing': True}
     )
 

@@ -134,6 +134,17 @@ class IpasgoScraper(BaseScraper):
 
     def execute_op(self, op_name, job_data):
         """Generic OP loader and executor."""
+        # Módulos core/ ficam cacheados em sys.modules; OPs são recarregadas do
+        # disco a cada job. Sem isto, mudanças em core/ exigem restart do worker
+        # (incidente job #19062: AttributeError em método novo do WebPlanClient).
+        try:
+            if self.module_path not in sys.path:
+                sys.path.insert(0, self.module_path)
+            from core.module_reloader import reload_stale_modules
+            reload_stale_modules(self.module_path, log=lambda m: self.log(m, level="WARN"))
+        except Exception as reload_err:
+            self.log(f"Hot-reload de módulos core falhou (segue com cache atual): {reload_err}", level="WARN")
+
         op_file = f"{op_name}.py"
         op_path = os.path.join(self.module_path, "op", op_file)
         
@@ -208,6 +219,7 @@ class IpasgoScraper(BaseScraper):
             "12": "op12_impressao_api",
             "13": "op13_criar_lote",
             "14": "op14_cancelar_lote",
+            "15": "op15_enviar_justificativa",
             "13_poll": "op13_poll_lote",
             "Execução": "op4_confirma_guia",
             "execucao": "op4_confirma_guia",

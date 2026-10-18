@@ -2,7 +2,7 @@
     "num_servers": 7,
     "login": "REC2209525",
     "password": "Unimed@2025",
-    "token": "wk_XqcKwSpSFElHOPNIRnLrDe9X",
-    "headless": false,
+    "token": "wk_Y0zNjLUpG7A2977q5r8hDaup",
+    "headless": true,
     "autostart": false
 }
