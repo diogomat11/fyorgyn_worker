@@ -21,6 +21,13 @@ class ScraperFactory:
              spec.loader.exec_module(caesan_module)
              return caesan_module.CaesanScraper(id_convenio=id_convenio, db=db, headless=headless, user_id=user_id)
 
+        if id_integrador == 3 or (id_integrador is None and id_convenio == 3): # UNIMED GOIANIA (+ Intercâmbio conv 21)
+             target_file = os.path.join(worker_dir, "3-unimed_goiania", "core", "scraper.py")
+             spec = importlib.util.spec_from_file_location("goiania_scraper", target_file)
+             goiania_module = importlib.util.module_from_spec(spec)
+             spec.loader.exec_module(goiania_module)
+             return goiania_module.UnimedScraper(id_convenio=id_convenio, db=db, headless=headless, user_id=user_id)
+
         if id_convenio == 1: # BRADESCO
              target_file = os.path.join(worker_dir, "1-bradesco", "core", "scraper.py")
              spec = importlib.util.spec_from_file_location("bradesco_scraper", target_file)
@@ -41,13 +48,6 @@ class ScraperFactory:
              anapolis_module = importlib.util.module_from_spec(spec)
              spec.loader.exec_module(anapolis_module)
              return anapolis_module.UnimedAnopolisScraper(id_convenio=id_convenio, db=db, headless=headless, user_id=user_id)
-
-        elif id_convenio == 3: # UNIMED GOIANIA
-             target_file = os.path.join(worker_dir, "3-unimed_goiania", "core", "scraper.py")
-             spec = importlib.util.spec_from_file_location("goiania_scraper", target_file)
-             goiania_module = importlib.util.module_from_spec(spec)
-             spec.loader.exec_module(goiania_module)
-             return goiania_module.UnimedScraper(id_convenio=id_convenio, db=db, headless=headless, user_id=user_id)
 
         elif id_convenio == 100: # EVOLUIR
              target_file = os.path.join(worker_dir, "100-evoluir", "core", "scraper.py")
