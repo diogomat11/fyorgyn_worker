@@ -541,7 +541,8 @@ def execute(scraper, job_data: dict) -> list:
                     params["id_lote"] = id_lote
                 delivered_count += len(chunk)
                 scraper.log(f"[OP4] Chunk {chunk_seq} entregue ao hub: {len(chunk)} guias "
-                            f"(lote {id_lote}, inseridos {body.get('inserted')}, total entregue {delivered_count}).",
+                            f"(lote {id_lote}, inseridos {body.get('inserted')}, "
+                            f"reabsorvidos {body.get('reabsorvidos', 0)}, total entregue {delivered_count}).",
                             job_id=job_id)
             else:
                 status_code = resp.status_code if resp is not None else "sem conexão"
