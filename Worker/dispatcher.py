@@ -678,6 +678,11 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 # Regra de Negócio PO: Interromper Retentativas para erros Fatais (Carteira Inválida)
                 if "carteira inv" in err_msg.lower() or "dígito" in err_msg.lower() or "invalida" in err_msg.lower():
                     current_job.attempts = max(3, current_job.attempts or 0)
+
+                # Regra PO (plano_mfa_bradesco D4): código MFA expira — retry automático
+                # dispararia novo pedido de código sem ninguém olhando. Fatal.
+                if "MFA_TIMEOUT" in err_msg or "MFA_CANCELLED" in err_msg or "MFA_MAX_CYCLES" in err_msg:
+                    current_job.attempts = max(3, current_job.attempts or 0)
                 
                 # Log the full JSON response for debugging
                 try:

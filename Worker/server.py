@@ -43,6 +43,64 @@ app = FastAPI(lifespan=lifespan)
 from typing import Optional, Any
 import json as _json
 import traceback
+from datetime import datetime, timezone
+
+from fastapi.encoders import jsonable_encoder
+
+def _finalize_job_row(db, job_id: int, response: dict):
+    """
+    Grava o estado final do job DIRETAMENTE em worker.jobs.
+
+    Incidente 2026-10-30 (job 23603, IPASGO OP11): quando o job demora mais
+    que o timeout HTTP do dispatcher (600s), a resposta do worker vai para uma
+    conexão já fechada e ninguém atualizava a linha — o job ficava 'processing'
+    por horas (recover do dispatcher = 180min; reclaim do hub pula worker vivo).
+
+    O UPDATE é condicional (status='processing'): primeiro que escreve ganha.
+    Se o dispatcher recebeu a resposta em tempo hábil, ele já gravou o estado e
+    o update aqui não altera nada — sem corrida.
+    """
+    from models import Job as JobModel
+    from sqlalchemy import update
+    try:
+        db.rollback()  # descarta estado sujo da sessão compartilhada com o scraper
+        now = datetime.now(timezone.utc)
+        # Normaliza para tipos JSON (datas → ISO), igual ao que o HTTP entregaria
+        payload = jsonable_encoder(response)
+        if response.get("status") == "success":
+            stmt = (
+                update(JobModel)
+                .where(JobModel.id == job_id, JobModel.status == "processing")
+                .values(
+                    status="success",
+                    result_data=payload,
+                    result_consumed=False,  # o sync loop do hub (15s) consome
+                    locked_by=None,
+                    updated_at=now,
+                )
+            )
+        else:
+            err = (response.get("message") or "Unknown error from worker")[:1000]
+            stmt = (
+                update(JobModel)
+                .where(JobModel.id == job_id, JobModel.status == "processing")
+                .values(
+                    status="error",
+                    error_message=err,
+                    locked_by=None,
+                    updated_at=now,
+                )
+            )
+        result = db.execute(stmt)
+        db.commit()
+        if result.rowcount:
+            print(f">>> Job {job_id} finalizado no banco pelo worker (status={response.get('status')}).")
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        print(f">>> Falha ao finalizar job {job_id} no banco: {e}")
 
 class JobRequest(BaseModel):
     job_id: int
@@ -143,7 +201,9 @@ def process_job(job: JobRequest):
         if isinstance(results, dict) and results.get("self_persisted"):
             meta = results
             print(f">>> Job {job.job_id} self-persisted: {meta.get('inserted', 0)} inserted, {meta.get('updated', 0)} updated")
-            return {"status": "success", "data": [], "meta": meta, "job_id": job.job_id}
+            resp = {"status": "success", "data": [], "meta": meta, "job_id": job.job_id}
+            _finalize_job_row(db, job.job_id, resp)
+            return resp
 
         # Handle dict results that carry a list under "data" plus extra metadata
         # (ex.: op1_consulta da Unimed Goiania devolve {"data": [...], "valida_prestador": {...}}).
@@ -153,15 +213,20 @@ def process_job(job: JobRequest):
             envelope = {"status": "success", "job_id": job.job_id}
             envelope.update(results)  # inclui "data" e quaisquer chaves extras
             print(f">>> Returning {len(envelope.get('data'))} items for Job {job.job_id} (dict payload)")
+            _finalize_job_row(db, job.job_id, envelope)
             return envelope
 
         print(f">>> Returning {len(results) if results else 0} items for Job {job.job_id}")
-        return {"status": "success", "data": results, "job_id": job.job_id}
-        
+        resp = {"status": "success", "data": results, "job_id": job.job_id}
+        _finalize_job_row(db, job.job_id, resp)
+        return resp
+
     except Exception as e:
         print(f"Error processing job: {e}")
         traceback.print_exc()
-        return {"status": "error", "message": str(e), "job_id": job.job_id}
+        resp = {"status": "error", "message": str(e), "job_id": job.job_id}
+        _finalize_job_row(db, job.job_id, resp)
+        return resp
     finally:
         sel_manager.set_processing(driver_key, False)
         if db:

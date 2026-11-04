@@ -28,3 +28,7 @@ dist/
 # Scratch files
 scratch/
 test_scripts/
+
+# Debug dumps
+Worker/**/debug/
+debug/

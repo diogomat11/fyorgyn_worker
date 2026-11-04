@@ -130,7 +130,10 @@ class IpasgoScraper(BaseScraper):
 
     def login(self):
         """Executes OP0 login routine."""
-        return self.execute_op("op0_login", {"job_id": "internal_login"})
+        # Logs do login carregam o job_id real quando o login roda dentro de um
+        # job (retry do process_job) — antes iam para 'internal_login' e sumiam
+        # da view de logs do job (incidente 23603: "sumiu após Attempt 1 failed").
+        return self.execute_op("op0_login", {"job_id": getattr(self, "_current_job_id", None) or "internal_login"})
 
     def execute_op(self, op_name, job_data):
         """Generic OP loader and executor."""
@@ -164,6 +167,7 @@ class IpasgoScraper(BaseScraper):
 
     def process_job(self, rotina, job_data):
         job_id = job_data.get("job_id") or job_data.get("id")
+        self._current_job_id = job_id
         start_time = datetime.now()
         
         execution = JobExecution(
@@ -220,6 +224,9 @@ class IpasgoScraper(BaseScraper):
             "13": "op13_criar_lote",
             "14": "op14_cancelar_lote",
             "15": "op15_enviar_justificativa",
+            "16": "op16_enviar_recurso_glosa",
+            "17": "op17_importar_conferencia",
+            "18": "op18_conferir_faturamento",
             "13_poll": "op13_poll_lote",
             "Execução": "op4_confirma_guia",
             "execucao": "op4_confirma_guia",

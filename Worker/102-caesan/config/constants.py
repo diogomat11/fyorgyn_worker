@@ -34,7 +34,49 @@ X_LOGIN_BOTAO_FALLBACKS = [
     '//button[@type="submit"]',
 ]
 
-# ── OP1: Autorização SP-SADT (índices conforme mapeamento do portal) ──
+# ── OP1: Autorização SP-SADT ──
+# ── MAPEAMENTO OFICIAL (extraído do HTML real do portal em produção, 2026-11-03;
+# evidência em 102-caesan/debug/) ──
+# O SP-SADT é um form AngularJS: os identificadores estáveis são os próprios
+# ng-model/ng-click do portal (primeiro candidato de cada campo) — os xpaths
+# absolutos do mapeamento original (divs numerados) ficam como fallback porque
+# deslocam quando o portal insere wrappers (banner pós-login).
+# Campos de data são input[type=text] (send_keys + TAB; Angular binda por evento).
+X_DATA_SOLICITACAO_NG = "//input[@ng-model='objVO0481.dtpedido']"
+X_SELECT_CARATER_NG = "//select[@ng-model='objVO0481.caratersolicitacao']"
+X_INPUT_CARTEIRA_NG = "//input[@ng-model='objVO0481.codassociado']"
+X_INPUT_NOMEBENEF_NG = "//input[@ng-model='usuario.nombeneficiario']"  # hidden: validação da carteira
+X_SELECT_TIPO_ATEND_NG = "//select[@ng-model='objVO0481.tipoexame']"
+X_SELECT_TIPO_CONSULTA_NG = "//select[@ng-model='objVO0481.codtipconsulta']"
+X_SELECT_RECEM_NATO_NG = "//select[@ng-model='objVO0481.atendimentorn']"
+X_SELECT_IND_ACIDENTE_NG = "//select[@ng-model='objVO0481.codindacidente']"
+X_BOTAO_PROFISSIONAL_NG = "//button[@ng-click='ModalProfissional()']"
+X_INPUT_BUSCA_PROF_NG = "//input[@ng-model='buscaProfissional']"
+X_BOTAO_BUSCA_PROF_NG = "//button[@ng-click='buscaProfissionais()']"
+X_LINHA_PROF_MODAL_NG = "//*[@id='modalProfissional']//table//tbody//tr[td]"  # ngRepeat todo in filteredTodos
+X_INPUT_PROF_SELEC_NG = "//input[@ng-model='objVO0406.nome']"  # disabled: preenchido ao selecionar
+X_DATA_ATENDIMENTO_NG = "//input[@ng-model='objVO0481.dtprovproc']"
+X_INPUT_SECRETARIA_NG = "//input[@ng-model='objVO0481.secretsolic']"
+X_TEXTAREA_JUSTIFICATIVA_NG = "//textarea[@ng-model='objVO0481.indicacao']"
+X_SELECT_TABELA_NG = "//select[@ng-model='objVO0482.codtabela']"
+X_INPUT_CODIGO_NG = "//input[@ng-model='objVO0482.codprocedimento']"
+X_INPUT_QUANTIDADE_NG = "//input[@ng-model='objVO0482.qtdsolicitada']"
+X_BOTAO_INCLUIR_NG = "//button[@ng-click='adicionarProcedimento()']"
+X_INPUT_CAMINHO_DOC_NG = "//input[@ng-model='objVO0481.lstarquivos']"
+X_BOTAO_GRAVAR_NG = "//button[@ng-click='gravarGuia()']"
+
+# Values reais das options (ng-options — value='string:<codigo>'; extraídos do HTML):
+VAL_CARATER_ELETIVO = "string:1"          # '1 - Eletivo'
+VAL_TIPO_ATEND_OUTRAS_TERAPIAS = "string:03"  # 'Outras Terapias'
+VAL_TIPO_CONSULTA = "string:4"            # 'Por encaminhamento' (option[2] do mapeamento original)
+VAL_RECEM_NATO = "string:0"               # 'Não'
+VAL_INDICACAO_ACIDENTE = "string:9"       # 'Não Acidente'
+# Tabela: value = 'string:22' (Terapias Convencionais) | 'string:00' (Tabela Interna Caesan/Especiais)
+TABELA_VALUE = {"22": "string:22", "00": "string:00"}
+
+# ── Xpaths absolutos históricos (fallback — quebram se o layout deslocar divs) ──
+
+# Xpaths absolutos históricos (fallback — quebram se o layout deslocar divs)
 X_FORM_DATA_SOLICITACAO = '/html/body/div[5]/div[2]/div[2]/form/div[1]/input'
 X_SELECT_CARATER = '/html/body/div[5]/div[2]/div[2]/form/div[2]/select'
 X_OPTION_CARATER_ELETIVO = X_SELECT_CARATER + '/option[2]'
@@ -76,10 +118,18 @@ TABELA_OPTION_INDEX = {"22": 2, "00": 6}
 # Valor fixo do campo secretaria (padrão Evoluir)
 SECRETARIA_PADRAO = "JANAINA"
 
+# Modal de confirmação #alerta (sucesso — xpath oficial do cliente) e #alertafalha (erro)
+X_ALERTA_FALHA = '//*[@id="alertafalha"]//div[contains(@class,"modal-body")]'
+
 # ── OP1: Captura do número da solicitação após Gravar ──
-# PENDÊNCIA: xpath oficial do frame de confirmação ainda não enviado.
-# Candidatos best-effort (sweet-alert / modal / toast) — varridos em ordem.
+# Xpath oficial do campo de confirmação do portal:
+#   "Guia gravada com sucesso - número da guia: 892706"
+X_RESULT_NUMERO_OFICIAL = '//*[@id="alerta"]/div/div/div[2]/p'
+# Fallbacks best-effort (sweet-alert / modal / toast) — varridos em ordem
+# caso o bloco oficial não esteja presente.
 X_RESULT_NUMERO_CANDIDATES = [
+    X_RESULT_NUMERO_OFICIAL,
+    '//*[@id="alerta"]//p',
     '//div[contains(@class,"sweet-alert")]//h2',
     '//div[contains(@class,"sweet-alert")]//p',
     '//div[contains(@class,"modal")]//div[contains(@class,"modal-body")]',
@@ -88,12 +138,26 @@ X_RESULT_NUMERO_CANDIDATES = [
 ]
 RESULT_NUMERO_REGEX = r'(\d{5,10})'
 
+# ── OP1: Validação de Datas, Pacing Passo a Passo e Procedimentos (AngularJS) ──
+REGEX_DATA_DDMMAAAA = r'^\d{2}/\d{2}/\d{4}$'
+REGEX_DATA_ISO = r'^\d{4}-\d{2}-\d{2}$'
+ITEM_DESCRICAO_TIMEOUT = 15
+ITEM_INCLUIR_TIMEOUT = 10
+PAUSA_PASSO_FORM = 0.8
+PAUSA_PRE_INCLUIR_ITEM = 2.0
+PAUSA_POS_INCLUIR_ITEM = 2.5
+PAUSA_POS_ANEXO = 2.5
+PAUSA_PRE_GRAVAR_PADRAO = 2.0
+X_LINHAS_PROCEDIMENTOS_TABELA = "//table//tbody//tr[contains(@ng-repeat,'objVO0481.procedimentos')] | //section[contains(.,'Procedimento(s) TUSS')]/following-sibling::table[1]//tbody//tr[td]"
+
 # ── Anexos (padrão PADROES_ROTINAS §4.2) ──
 ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png"}
 MAX_ANEXO_BYTES = 5 * 1024 * 1024  # 5MB
 
-# ── OP2: Webservice BIOS (ws2.bios.inf.br) ──
+# ── OP2 / Consultas BIOS: Webservice BIOS (ws2.bios.inf.br) ──
 BIOS_WS_CODDAO_CONSULTA = 490
+BIOS_WS_CODDAO_PENDENTES = 544
+BIOS_WS_CODDAO_AUTORIZADAS = 560
 BIOS_WS_CHAVE = "W8"
 BIOS_TIMEOUT_SEGUNDOS = 60
 BIOS_TENTATIVAS = 3

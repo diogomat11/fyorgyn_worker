@@ -23,9 +23,16 @@ from core.selenium_helpers import (
     clicar_elemento,
     elemento_existe,
 )
+from core.exceptions import MfaMaxCyclesError
+from core import mfa_helper
 
 if TYPE_CHECKING:
     from base_scraper import BaseScraper
+
+# Tela de código MFA do Faturi (Keycloak) — seletores fornecidos pelo PO (2026-10-21)
+MFA_INPUT_BY = By.ID
+MFA_INPUT = "code"
+MFA_SUBMIT_XPATH = '//*[@id="kc-form-buttons"]/input'
 
 def run(scraper: BaseScraper, job_data: dict) -> list:
     """
@@ -43,9 +50,19 @@ def run(scraper: BaseScraper, job_data: dict) -> list:
         clicar_elemento(driver, By.NAME, "Faturi", timeout=15)
         scraper.log("Botão Faturi clicado, aguardando tela de login...", job_id=job_id)
 
-        # Aguardar o campo de username
-        aguardar_elemento(driver, By.ID, "username", timeout=15)
-        
+        # Sessão já ativa? Com o usuário autenticado, o portal pula o formulário
+        # e vai direto à área logada — #username nunca aparece (incidentes de
+        # retry/20652: a 2ª visita à página explodia no timeout do elemento).
+        try:
+            aguardar_elemento(driver, By.ID, "username", timeout=10)
+        except Exception:
+            url_atual = (driver.current_url or "").lower()
+            if "fature" in url_atual or "prestador" in url_atual:
+                scraper.log("Sessão do Faturi já estava ativa — pulando login.", job_id=job_id)
+                _tratar_mensagens_iniciais(scraper, driver, job_id)
+                return [{"status": "success", "message": "Login Faturi OK (sessão já ativa)"}]
+            raise
+
         # Preencher credenciais
         scraper.log(f"Preenchendo login para o usuário: {scraper.username}", job_id=job_id)
         preencher_input(driver, By.ID, "username", scraper.username)
@@ -58,6 +75,11 @@ def run(scraper: BaseScraper, job_data: dict) -> list:
         # Aguardar carregamento da página interna
         time.sleep(3)
 
+        # Verificação de MFA (PO 2026-10-21): o portal pede um código enviado ao
+        # usuário (validade de 24h no servidor). Se a tela aparecer, o código é
+        # solicitado ao dono do job via banco (modal no frontend) — ver mfa_helper.
+        _handle_mfa_if_needed(scraper, driver, job_id)
+
         # Tratar notificações modais (mensagemImg) que aparecem após login
         _tratar_mensagens_iniciais(scraper, driver, job_id)
 
@@ -67,6 +89,59 @@ def run(scraper: BaseScraper, job_data: dict) -> list:
     except Exception as e:
         scraper.log(f"Erro no login de faturamento: {str(e)}", level="ERROR", job_id=job_id)
         raise
+
+
+def _handle_mfa_if_needed(scraper: BaseScraper, driver, job_id):
+    """Se a tela de código MFA (#code) estiver visível, conduz o fluxo interativo:
+    solicita o código ao usuário (banco → modal), preenche, confirma e valida.
+
+    Sucesso = campo #code deixa de existir após a confirmação. Código rejeitado =
+    tela permanece → novo ciclo (máx. mfa_helper.MFA_MAX_CYCLES → MfaMaxCyclesError).
+    MfaTimeoutError/MfaCancelledError propagam do helper (erros fatais, sem retry).
+    """
+    if not elemento_existe(driver, MFA_INPUT_BY, MFA_INPUT, timeout=5):
+        return  # Sem MFA — segue o fluxo normal do login
+
+    scraper.log("Tela de código MFA detectada no Faturi", job_id=job_id)
+    for ciclo in range(1, mfa_helper.MFA_MAX_CYCLES + 1):
+        mfa_helper.solicitar_codigo(scraper, job_id, ciclo)
+        codigo = mfa_helper.aguardar_codigo(scraper, job_id)
+
+        campo = driver.find_element(MFA_INPUT_BY, MFA_INPUT)
+        campo.clear()
+        campo.send_keys(codigo)
+        clicar_elemento(driver, By.XPATH, MFA_SUBMIT_XPATH, timeout=10)
+        scraper.log("Código MFA informado no portal. Aguardando validação...", job_id=job_id)
+
+        time.sleep(4)
+        _dump_html_pos_codigo(driver, ciclo)
+
+        if not elemento_existe(driver, MFA_INPUT_BY, MFA_INPUT, timeout=5):
+            scraper.log(f"Código MFA validado pelo portal (ciclo {ciclo})", job_id=job_id)
+            mfa_helper.limpar_estado(scraper, job_id)
+            return
+
+        scraper.log(
+            "Código MFA rejeitado — a tela de código continua visível",
+            level="WARN", job_id=job_id,
+        )
+        if ciclo >= mfa_helper.MFA_MAX_CYCLES:
+            raise MfaMaxCyclesError()
+
+    raise MfaMaxCyclesError()
+
+
+def _dump_html_pos_codigo(driver, ciclo: int):
+    """Salva o HTML pós-confirmação do código (material para refinar o mapeamento
+    das mensagens de erro do Keycloak na primeira execução real). Best-effort."""
+    try:
+        root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "scratch", "spike_mfa"))
+        os.makedirs(root, exist_ok=True)
+        path = os.path.join(root, f"fature_mfa_pos_codigo_ciclo{ciclo}.html")
+        with open(path, "w", encoding="utf-8", errors="replace") as f:
+            f.write(driver.page_source or "")
+    except Exception:
+        pass
 
 
 def _tratar_mensagens_iniciais(scraper: BaseScraper, driver, job_id=None):

@@ -1,0 +1,20 @@
+﻿id_procedimento;nome;codigo_procedimento;faturamento;status;id_area;id_convenio
+157;NUTRICAO - Consulta Ambulatorial por Nutricionista (Retorno 30 dias);50000560;50000560;ativo;11;16
+158;TERAPIA OCUPACIONAL - Consulta individual ambulatorial em Terapia Ocupacional;50000055;50000055;ativo;9;16
+159;FONOAUDIOLOGIA - Otoemissões evocadas transientes (Teste da Orelhinha);40103463;40103463;ativo;4;16
+160;FONOAUDIOLOGIA - Consulta individual ambulatorial de Fonoaudiologia - Teste Linguinha;50000586;50000586;ativo;4;16
+161;FONOAUDIOLOGIA - Consulta individual ambulatorial de Fonoaudiologia;50000586;50000586;ativo;4;16
+162;PSICOLOGIA - Psicoterapia Primeira consulta;50000462;50000462;ativo;6;16
+163;PSICOLOGIA - Consulta Ambulatorial em Psicologia;50001221;50001221;ativo;6;16
+164;FONOAUDIOLOGIA - Sessão individual ambulatorial de Fonoaudiologia;50000616;50000616;ativo;4;16
+165;PSICOLOGIA - Sessão de Psicoterapia individual por Psicólogo;50000470;50000470;ativo;6;16
+166;PSICOMOTRICIDADE - Sessão de Psicomotricidade Individual;50000012;50000012;ativo;7;16
+167;PSICOPEDAGOGIA - Sessão de Psicopedagogia;2210000002;2210000002;ativo;8;16
+168;TERAPIA OCUPACIONAL - Sessão individual ambulatorial em Terapia Ocupacional;50000080;50000080;ativo;9;16
+169;FISIOTERAPIA - Fisioterapia - Terapias Especiais;2250005106;2250005106;ativo;3;16
+170;FONOAUDIOLOGIA - Fonoaudiologia - Terapias Especiais;2250005107;2250005107;ativo;4;16
+171;MUSICOTERAPIA - Musicoterapia - Terapias Especiais;2250005108;2250005108;ativo;5;16
+172;PSICOLOGIA - Psicologia - Terapias Especiais;2250005109;2250005109;ativo;6;16
+173;PSICOMOTRICIDADE - Psicomotricidade - Terapias Especiais;2250005110;2250005110;ativo;7;16
+174;PSICOPEDAGOGIA - Psicopedagogia - Terapias Especiais;2250005118;2250005118;ativo;8;16
+175;TERAPIA OCUPACIONAL - Terapia Ocupacional - Terapias Especiais;2250005117;2250005117;ativo;9;16

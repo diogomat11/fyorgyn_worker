@@ -10,10 +10,16 @@ _worker_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 if _worker_root not in sys.path:
     sys.path.insert(0, _worker_root)
 
+# Raiz do módulo 1-bradesco (para core.exceptions / core.mfa_helper dos op_*)
+_module_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _module_root not in sys.path:
+    sys.path.insert(0, _module_root)
+
 from base_scraper import BaseScraper
 from models import Convenio, JobExecution, UserConvenio
 from security_utils import decrypt_password
 from database import SessionLocal
+from core.exceptions import MfaError, SessionExpiredError
 
 
 class BradescoScraper(BaseScraper):
@@ -118,6 +124,24 @@ class BradescoScraper(BaseScraper):
     def close_driver(self):
         pass  # Managed by SeleniumManager
 
+    def _reciclar_driver(self, job_id=None):
+        """Escada de recuperação de sessão (plano MFA/cascata, FASE C): a sessão
+        persistiu expirada mesmo após re-login no mesmo driver → recicla o Chrome
+        com quit() SEM logoff (nunca clicamos em 'sair'). O próximo attempt pega
+        um driver novo pelo pool (get_driver detecta o driver morto na chave)."""
+        drv = getattr(self, "driver", None)
+        if drv is not None:
+            try:
+                drv.quit()
+            except Exception:
+                pass
+        self.driver = None
+        self.log(
+            "Driver reciclado (sessão expirada persistiu após re-login) — "
+            "novo Chrome será criado na próxima tentativa",
+            job_id=job_id,
+        )
+
     def log(self, message, level="INFO", job_id=None, carteirinha_id=None):
         job_prefix = f"[Job {job_id}] " if job_id else ""
         print(f"[{level}] [BRADESCO] {job_prefix}{message}")
@@ -218,6 +242,7 @@ class BradescoScraper(BaseScraper):
         results = []
         error_msg = None
         error_cat = "scraper_error"
+        sessoes_expiradas = 0  # quedas consecutivas de sessão (escada: 2ª → reciclar driver)
 
         contexto = job_data.get("contexto", "autorize")
         
@@ -275,7 +300,13 @@ class BradescoScraper(BaseScraper):
                         except Exception as pool_err:
                             self.log(f"Using isolated driver mode: {pool_err}", level="WARN", job_id=job_id)
 
-                    self.login(job_data)
+                    # Incidente 20652: quando a rotina JÁ É o login (op0_login),
+                    # self.login() e execute_op() executavam o MESMO op duas vezes
+                    # — a 2ª navega de volta ao portal já autenticado e falha.
+                    # op0_login é auto-suficiente (detecta sessão ativa/MFA); as
+                    # demais rotinas seguem o fluxo login → operação.
+                    if op_name != "op0_login":
+                        self.login(job_data)
 
                 # Update the active login session on the driver object
                 if self.driver:
@@ -286,8 +317,32 @@ class BradescoScraper(BaseScraper):
 
                 execution.status = "success"
                 break
+            except MfaError as e:
+                # Código MFA expira — retry automático é inútil (plano_mfa_bradesco D4)
+                error_msg = str(e)
+                self.log(f"Attempt {attempt + 1} failed (MFA — sem retry): {error_msg}", level="ERROR", job_id=job_id)
+                execution.status = "error"
+                break
+            except SessionExpiredError as e:
+                # Escada de recuperação (FASE C): 1ª queda → re-login no mesmo driver
+                # (attempt seguinte já força need_login); 2ª consecutiva → reciclar o
+                # Chrome (quit sem logoff) e re-login em estado limpo (com MFA se devido).
+                error_msg = str(e)
+                sessoes_expiradas += 1
+                self.log(
+                    f"Attempt {attempt + 1} failed: {error_msg} "
+                    f"(queda de sessão {sessoes_expiradas}/2)",
+                    level="ERROR", job_id=job_id,
+                )
+                if sessoes_expiradas >= 2:
+                    self._reciclar_driver(job_id=job_id)
+                if attempt < self.max_retries - 1:
+                    time.sleep(5)
+                else:
+                    execution.status = "error"
             except Exception as e:
                 error_msg = str(e)
+                sessoes_expiradas = 0
                 self.log(f"Attempt {attempt + 1} failed: {error_msg}", level="ERROR", job_id=job_id)
                 if attempt < self.max_retries - 1:
                     time.sleep(5)
@@ -306,5 +361,13 @@ class BradescoScraper(BaseScraper):
             self.db.commit()
         except Exception:
             self.db.rollback()
+
+        # Propaga a falha para o server/dispatcher: antes, uma OP com erro que
+        # retornava lista vazia era envelopada como {"status": "success", "data": []}
+        # pelo server (incidente job 20646 — MFA_TIMEOUT terminou em job success
+        # vazio). Com o raise, o server devolve status=error e o dispatcher marca
+        # o job (aplicando inclusive a regra fatal de MFA_*).
+        if execution.status != "success":
+            raise ValueError(error_msg or "Unknown Error")
 
         return results

@@ -118,9 +118,15 @@ def run(scraper, job_data):
     # 3. Retornar status do lote encontrado ou processando
     if lote_id_api:
         scraper.log(f"OP13_poll - Lote pronto! ID: {lote_id_api}", job_id=job_id)
+        # Protocolo (capa do ConferenciaFaturamento), se o LoadLotes do novo
+        # portal já o expuser; usado pelo chain para a OP17.
+        protocolo_lote = None
+        if isinstance(lotes_data, dict) and lotes_data.get("Lotes"):
+            protocolo_lote = lotes_data["Lotes"][0].get("Protocolo")
         return {
             "status": "ready",
             "lote_id_api": lote_id_api,
+            "protocolo": protocolo_lote,
             "id_lote_interno": id_lote_interno,
             "cod_prestador": cod_prestador
         }

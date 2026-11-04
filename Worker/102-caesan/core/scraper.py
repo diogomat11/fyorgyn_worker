@@ -146,6 +146,27 @@ class CaesanScraper(BaseScraper):
         if not os.path.exists(op_path):
             raise FileNotFoundError(f"Operação {op_name} não encontrada em {op_path}")
 
+        # Purga módulos de INTEGRADORES cacheados em sys.modules (qualquer
+        # Worker/<id>-*): o OP é recarregado do disco a cada execução
+        # (hot-reload na frota), mas `from config.constants import ...`
+        # resolveria pelo cache — incluindo o 'config' de OUTRO integrador
+        # quando o processo serviu outro convênio antes (cross-talk real:
+        # "cannot import name 'X_LOGIN_BOTAO_ACESAR' from ... 6-ipasgo").
+        # Módulos da raiz do Worker (base_scraper/models/...) ficam de fora.
+        for key in list(sys.modules):
+            mod = sys.modules.get(key)
+            mod_file = getattr(mod, "__file__", None)
+            if not mod_file:
+                continue
+            mod_abs = os.path.abspath(mod_file)
+            # dentro de Worker\<dígitos>-...\ ?
+            partes = mod_abs.lower().split(os.sep)
+            try:
+                idx = next(i for i, p in enumerate(partes) if p == "worker" and i + 1 < len(partes) and partes[i + 1][0].isdigit())
+            except StopIteration:
+                continue
+            del sys.modules[key]
+
         spec = importlib.util.spec_from_file_location(op_name, op_path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)

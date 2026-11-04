@@ -91,6 +91,15 @@ class Job(Base):
     timeout = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    # MFA Bradesco (Faturi) — estado em trânsito do código (migration 0113).
+    # mfa_code é apagado após consumo; jamais logar/expo (plano_mfa_bradesco D9).
+    mfa_required_at = Column(DateTime(timezone=True), nullable=True)
+    mfa_expires_at = Column(DateTime(timezone=True), nullable=True)
+    mfa_code = Column(Text, nullable=True)
+    mfa_submitted_at = Column(DateTime(timezone=True), nullable=True)
+    mfa_consumed_at = Column(DateTime(timezone=True), nullable=True)
+    mfa_cancelled = Column(Boolean, default=False)
+    mfa_attempts = Column(Integer, default=0)
 
     # Nota: Carteirinha e Convenio estão no schema 'public' (schema diferente do worker).
     # Relacionamentos ORM cross-schema não são suportados. Use carteirinha_id e id_convenio

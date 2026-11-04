@@ -455,3 +455,227 @@ class WebPlanClient:
                 if attempt == 2:
                     raise e
                 time.sleep(3)
+
+    # ── Recurso de Glosa (OP10 importação / OP16 envio de justificativas) ──
+
+    def _recurso_glosa_headers(self):
+        return {
+            "X-Requested-With": "XMLHttpRequest",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Referer": "https://novowebplanipasgo.facilinformatica.com.br/GuiasTISS/RecursoGlosa"
+        }
+
+    def _recurso_glosa_request(self, method, url, **kwargs):
+        """
+        Executa uma requisição do módulo RecursoGlosa com o padrão da casa:
+        retry x3, detecção de sessão expirada (Content-Type HTML) e unwrap
+        de JSON duplamente serializado (.NET WebPlan).
+        """
+        kwargs.setdefault("headers", self._recurso_glosa_headers())
+        kwargs.setdefault("timeout", 60)
+
+        for attempt in range(3):
+            try:
+                resp = self.session.request(method, url, **kwargs)
+                if 'text/html' in resp.headers.get('Content-Type', ''):
+                    if attempt < 2:
+                        logging.warning("RecursoGlosa retornou HTML (sessão expirada?). Refrescando sessão e retentando...")
+                        self.refresh_session()
+                        time.sleep(2)
+                        continue
+                    raise ValueError(
+                        f"Sessão Rejeitada no RecursoGlosa (Retornou HTML). "
+                        f"Status: {resp.status_code}. URL: {resp.url}"
+                    )
+                resp.raise_for_status()
+                data = resp.json()
+                if isinstance(data, str):
+                    data = json.loads(data)
+                if isinstance(data, dict) and data.get("HasError", False):
+                    raise ValueError(f"API Error RecursoGlosa: {data.get('ErrorMessage')}")
+                return data
+            except Exception as e:
+                logging.error(f"Erro no RecursoGlosa ({url}: {e}")
+                if attempt == 2:
+                    raise e
+                time.sleep(3)
+
+    def get_recurso_glosa_capa(self, protocolo):
+        """
+        OP10 - GET /RecursoGlosa/Carregar?id={protocolo}
+        Valida o acesso ao lote (capa) e devolve o JSON inicial, de onde se
+        extrai Servicos.NumeroDePaginas (total de páginas de itens do lote).
+        """
+        url = "https://novowebplanipasgo.facilinformatica.com.br/RecursoGlosa/Carregar"
+        return self._recurso_glosa_request(
+            "GET", url, params={"id": str(protocolo), "_": int(time.time() * 1000)}
+        )
+
+    def get_recurso_glosa_servicos(self, protocolo, pagina=1,
+                                   apenas_recursando=False, apenas_sem_justificativa=False):
+        """
+        OP10 - GET /RecursoGlosa/PesquisarServicosLote
+        Retorna {QuantidadePorPagina, NumeroDePaginas, Pagina, MensagemDeAte, Servicos[]}.
+        """
+        url = "https://novowebplanipasgo.facilinformatica.com.br/RecursoGlosa/PesquisarServicosLote"
+        params = {
+            "idCapa": str(protocolo),
+            "pagina": int(pagina),
+            "apenasRecursando": "true" if apenas_recursando else "false",
+            "apenasSemJustificativa": "true" if apenas_sem_justificativa else "false",
+            "_": int(time.time() * 1000),
+        }
+        return self._recurso_glosa_request("GET", url, params=params)
+
+    def post_salvar_digitacao_parcialmente(self, capa, servicos, pesquisar_recursos_salvos=False):
+        """
+        OP16 - POST /RecursoGlosa/SalvarDigitacaoParcialmente
+        Grava as justificativas de recurso dos serviços do lote (capa).
+
+        servicos: lista de dicts com Chave, ChaveUtServ, QuantidadeGlosada,
+        ValorRecurso e Justificativa (mesma forma do payload do portal).
+        """
+        url = "https://novowebplanipasgo.facilinformatica.com.br/RecursoGlosa/SalvarDigitacaoParcialmente"
+
+        headers = self._recurso_glosa_headers()
+        headers["Content-Type"] = "application/json;charset=UTF-8"
+
+        payload = {
+            "Capa": int(capa),
+            "Servicos": servicos,
+            "PesquisarRecursosSalvos": bool(pesquisar_recursos_salvos),
+        }
+        return self._recurso_glosa_request("POST", url, headers=headers, json=payload)
+
+    # ── Conferência de Faturamento (OP17 importação / OP18 confirmação) ──
+
+    def _conferencia_headers(self, form=False):
+        headers = {
+            "X-Requested-With": "XMLHttpRequest",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Referer": "https://novowebplanipasgo.facilinformatica.com.br/ConferenciaFaturamento/Index",
+        }
+        if form:
+            headers["Content-Type"] = "application/x-www-form-urlencoded"
+        return headers
+
+    def get_conferencia_procedimentos(self, protocolo):
+        """
+        OP17 - GET /ConferenciaFaturamento/ObterProcedimentos?protocolo={p}&_={ms}
+
+        Cache-buster `_` = timestamp no momento da requisição (mesma forma do
+        portal). Retorna o JSON completo: {LimiteDiasFaturamento, Capa:{...
+        Guias:[{... Itens:[...]}]}, HasError, Message}.
+        """
+        url = "https://novowebplanipasgo.facilinformatica.com.br/ConferenciaFaturamento/ObterProcedimentos"
+        params = {
+            "protocolo": str(protocolo),
+            "_": int(time.time() * 1000),
+        }
+        for attempt in range(3):
+            try:
+                resp = self.session.get(
+                    url, params=params, headers=self._conferencia_headers(), timeout=120
+                )
+                if 'text/html' in resp.headers.get('Content-Type', ''):
+                    if attempt < 2:
+                        logging.warning("ObterProcedimentos retornou HTML (sessão expirada?). Refrescando...")
+                        self.refresh_session()
+                        time.sleep(2)
+                        continue
+                    raise ValueError(
+                        f"Sessão Rejeitada no ObterProcedimentos (Retornou HTML). "
+                        f"Status: {resp.status_code}. URL: {resp.url}"
+                    )
+                resp.raise_for_status()
+                data = resp.json()
+                if isinstance(data, str):
+                    data = json.loads(data)
+                if isinstance(data, dict) and data.get("HasError", False):
+                    raise ValueError(f"API Error ObterProcedimentos: {data.get('Message')}")
+                return data
+            except Exception as e:
+                logging.error(f"Erro no ObterProcedimentos (protocolo {protocolo}): {e}")
+                if attempt == 2:
+                    raise e
+                time.sleep(3)
+
+    def post_conferir_item(self, id_servico, status, id_detalhe=None):
+        """
+        OP18 - POST /ConferenciaFaturamento/ConferirItem (form-urlencoded)
+
+        status: 'Aceito' | 'Recusado' | 'Pendente' (domínio do novo portal).
+        """
+        url = "https://novowebplanipasgo.facilinformatica.com.br/ConferenciaFaturamento/ConferirItem"
+        payload = {
+            "idServico": id_servico,
+            "idDetalhe": id_detalhe if id_detalhe is not None else "",
+            "status": status,
+        }
+        for attempt in range(3):
+            try:
+                resp = self.session.post(
+                    url, data=payload, headers=self._conferencia_headers(form=True), timeout=60
+                )
+                if 'text/html' in resp.headers.get('Content-Type', ''):
+                    if attempt < 2:
+                        self.refresh_session()
+                        time.sleep(2)
+                        continue
+                    raise ValueError(
+                        f"Sessão Rejeitada no ConferirItem (Retornou HTML). "
+                        f"Status: {resp.status_code}. URL: {resp.url}"
+                    )
+                resp.raise_for_status()
+                data = resp.json()
+                if isinstance(data, str):
+                    data = json.loads(data)
+                if isinstance(data, dict) and data.get("HasError", False):
+                    raise ValueError(f"API Error ConferirItem: {data.get('Message')}")
+                return data
+            except Exception as e:
+                logging.error(f"Erro no ConferirItem (idServico {id_servico}): {e}")
+                if attempt == 2:
+                    raise e
+                time.sleep(3)
+
+    def post_editar_data_realizacao(self, codigo_prestador, id_servico, data_realizacao_br, id_detalhe=None):
+        """
+        OP18 - POST /ConferenciaFaturamento/EditarDataRealizacao (form-urlencoded)
+
+        codigo_prestador: código SEM dígito verificador (ex.: '01889' de '01889-2').
+        data_realizacao_br: 'dd/MM/yyyy' (URL-encoded pelo requests).
+        """
+        url = "https://novowebplanipasgo.facilinformatica.com.br/ConferenciaFaturamento/EditarDataRealizacao"
+        payload = {
+            "codigoPrestador": str(codigo_prestador),
+            "idServico": id_servico,
+            "idDetalhe": id_detalhe if id_detalhe is not None else "",
+            "dataRealizacao": data_realizacao_br,
+        }
+        for attempt in range(3):
+            try:
+                resp = self.session.post(
+                    url, data=payload, headers=self._conferencia_headers(form=True), timeout=60
+                )
+                if 'text/html' in resp.headers.get('Content-Type', ''):
+                    if attempt < 2:
+                        self.refresh_session()
+                        time.sleep(2)
+                        continue
+                    raise ValueError(
+                        f"Sessão Rejeitada no EditarDataRealizacao (Retornou HTML). "
+                        f"Status: {resp.status_code}. URL: {resp.url}"
+                    )
+                resp.raise_for_status()
+                data = resp.json()
+                if isinstance(data, str):
+                    data = json.loads(data)
+                if isinstance(data, dict) and data.get("HasError", False):
+                    raise ValueError(f"API Error EditarDataRealizacao: {data.get('Message')}")
+                return data
+            except Exception as e:
+                logging.error(f"Erro no EditarDataRealizacao (idServico {id_servico}): {e}")
+                if attempt == 2:
+                    raise e
+                time.sleep(3)

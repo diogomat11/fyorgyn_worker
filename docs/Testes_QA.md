@@ -114,3 +114,27 @@ Este documento serve como um guia para o QA tester validar as rotinas de cada co
 | | | | |
 | | | | |
 | | | | |
+
+---
+
+## 🏦 1 - BRADESCO (Faturi — contexto fature) — MFA + Consulta em Cascata (release 2026-10-21)
+
+### Login com MFA (código de validade 24h — pedido ~1x/dia)
+- [ ] Sem MFA devido (login nas últimas 24h): login segue direto ao dashboard, sem modal.
+- [ ] MFA devido: modal abre (≤6s) em QUALQUER tela do sistema (watcher global) com countdown 5:00.
+- [ ] Código correto: robô preenche `#code`, confirma e o login conclui; `mfa_code` apagado no fim (QA: `SELECT mfa_code FROM worker.jobs WHERE id=<job>` → NULL).
+- [ ] Código errado: portal re-pede; modal reabre com aviso "código anterior rejeitado" e novo countdown (ciclo 2).
+- [ ] 2º código errado: job error `MFA_MAX_CYCLES` SEM retry automático (attempts=3).
+- [ ] Não digitar em 5 min: job error `MFA_TIMEOUT` sem retry; modal fecha com "tempo esgotado".
+- [ ] Cancelar no modal: job error `MFA_CANCELLED` em ≤3s.
+- [ ] Outro usuário (tenant diferente) não vê o modal nem consegue POSTar o código (404).
+- [ ] Código MFA não aparece em nenhum log (`worker.logs`) nem em `result_data`.
+
+### OP1 — Cascata de consulta (reg_ans × status)
+- [ ] Guia faturada (status 5): localizada na 1ª tentativa do reg_ans do job (log `[FATURE] ... HTTP 200 → ...ms → 1 item`).
+- [ ] Guia existente só no REG ANS alternativo (421715): localizada no 2º bloco da cascata (antes: "não localizada").
+- [ ] Guia em status 101/102/103/3/403: localizada pela varredura de status.
+- [ ] Guia inexistente de verdade: todas as respostas 200 vazias → `status_guia: "Guia não localizada"` + `tentativas`/`duracao_ms` no resultado.
+- [ ] Sessão expirada durante a consulta (reproduzir esperando >timeout do Keycloak): log `Authentication failed`/401 → `SessionExpiredError` → re-login automático (attempt 2) → OP conclui; guia NUNCA sai como não localizada por causa disso.
+- [ ] Re-login não recupera (2ª queda consecutiva): driver reciclado (Chrome novo, SEM clicar "sair") → login em estado limpo (com MFA se devido) → OP conclui.
+- [ ] API fora/instável: falha transiente em todas as tentativas → job error re-tentável (retry do dispatcher), não "não localizada".
