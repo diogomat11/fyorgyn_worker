@@ -790,7 +790,28 @@ def _resolve_documento(caminho: str, carteira: str, scraper, job_id) -> Optional
             )
 
     if not os.path.isfile(local_path):
-        raise ValueError(f"Documento não encontrado: {local_path}")
+        # Alerta acionável (incidente 2026-11-11, job 23667): o nome vem da
+        # coluna 'caminho' da planilha (padrão RC-<carteira>-<paciente>-<ABREV>,
+        # ABREV = BASE_RC.ABREV). Se o arquivo exato não existe mas há outros
+        # RC da mesma carteira no diretório, lista-os para o usuário RENOMEAR o
+        # arquivo divergente ou corrigir a planilha — NUNCA anexa candidato
+        # automaticamente (pode ser o RC de OUTRA especialidade).
+        msg = f"Documento não encontrado: {local_path}"
+        pasta = os.path.dirname(local_path) or "."
+        try:
+            candidatos = [
+                os.path.basename(p) for p in glob.glob(os.path.join(pasta, f"RC-*{carteira}*"))
+                if os.path.splitext(p)[-1].lower() in ALLOWED_EXTENSIONS
+            ][:10]
+        except Exception:
+            candidatos = []
+        if candidatos:
+            msg += (
+                f" | RC(s) da carteira {carteira} encontrados no diretório: {candidatos} — "
+                f"renomeie o arquivo para o padrão da planilha (BASE_RC.ABREV) ou corrija "
+                f"a coluna 'caminho' e reprocesse."
+            )
+        raise ValueError(msg)
 
     ext = os.path.splitext(local_path)[-1].lower()
     if ext not in ALLOWED_EXTENSIONS:

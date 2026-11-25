@@ -23,8 +23,51 @@ from core.selenium_helpers import (
     clicar_elemento,
     elemento_existe,
 )
-from core.exceptions import MfaMaxCyclesError
+from core.exceptions import LoginFailedError, MfaMaxCyclesError
 from core import mfa_helper
+
+
+def _capturar_mensagem_erro(driver) -> str:
+    """Extrai mensagens de erro VISÍVEIS da página (login Keycloak/portal).
+
+    Seletores cobrem os temas padrão do Keycloak (#input-error, .alert-error,
+    .pf-m-error) e mensagens genéricas em português/inglês em alertas. Retorna
+    texto concatenado (máx. 300 chars) ou string vazia se nada visível.
+    """
+    try:
+        textos = driver.execute_script("""
+            var seletor = [
+                '#input-error', '.alert-error', '.pf-c-form__helper-text.pf-m-error',
+                '.alert-danger', '#kc-error-message', '.error-message',
+                '.login-error', '[class*="erro"]', '[class*="error"]'
+            ].join(', ');
+            var els = document.querySelectorAll(seletor);
+            var vistos = [];
+            els.forEach(function(el) {
+                if (!el.offsetParent && el.getClientRects().length === 0) return;  // invisível
+                var t = (el.textContent || '').trim();
+                if (t && t.length < 400 && vistos.indexOf(t) === -1) vistos.push(t);
+            });
+            return vistos.slice(0, 3).join(' | ');
+        """)
+        return (textos or "")[:300]
+    except Exception:
+        return ""
+
+
+def _dump_html_erro(driver, username):
+    """Salva o HTML da tela de erro de login (best-effort) para refinar
+    seletores/mensagens sem expor a senha (username apenas no nome não — vai no
+    conteúdo da página, que não contém a senha)."""
+    try:
+        root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "scratch", "spike_mfa"))
+        os.makedirs(root, exist_ok=True)
+        stamp = time.strftime("%Y%m%d_%H%M%S")
+        path = os.path.join(root, f"fature_login_erro_{stamp}.html")
+        with open(path, "w", encoding="utf-8", errors="replace") as f:
+            f.write(driver.page_source or "")
+    except Exception:
+        pass
 
 if TYPE_CHECKING:
     from base_scraper import BaseScraper
@@ -55,13 +98,20 @@ def run(scraper: BaseScraper, job_data: dict) -> list:
         # retry/20652: a 2ª visita à página explodia no timeout do elemento).
         try:
             aguardar_elemento(driver, By.ID, "username", timeout=10)
-        except Exception:
+        except Exception as exc:
             url_atual = (driver.current_url or "").lower()
             if "fature" in url_atual or "prestador" in url_atual:
                 scraper.log("Sessão do Faturi já estava ativa — pulando login.", job_id=job_id)
                 _tratar_mensagens_iniciais(scraper, driver, job_id)
                 return [{"status": "success", "message": "Login Faturi OK (sessão já ativa)"}]
-            raise
+            # Sem formulário e sem área logada: capturar o estado da página para
+            # diagnóstico (mensagem de erro, HTML) em vez de estourar timeout crú.
+            msg = _capturar_mensagem_erro(driver)
+            _dump_html_erro(driver, scraper.username)
+            raise LoginFailedError(
+                f"LOGIN_REJEITADO: formulário de login não apareceu (url={url_atual}, "
+                f"mensagem={msg or 'nenhuma'}, erro={type(exc).__name__})"
+            ) from exc
 
         # Preencher credenciais
         scraper.log(f"Preenchendo login para o usuário: {scraper.username}", job_id=job_id)
@@ -75,10 +125,37 @@ def run(scraper: BaseScraper, job_data: dict) -> list:
         # Aguardar carregamento da página interna
         time.sleep(3)
 
+        # Captura de mensagens da PÁGINA (incidente 26219+): o portal rejeita
+        # credenciais sem exceção — a mensagem aparece no próprio HTML. Sem
+        # isso, o login falhava genérico e o usuário não sabia o que corrigir.
+        msg_erro = _capturar_mensagem_erro(driver)
+        url_pos_login = (driver.current_url or "").lower()
+        login_ok = "prestador" in url_pos_login or "/fature" in url_pos_login
+        if msg_erro and not login_ok:
+            _dump_html_erro(driver, scraper.username)
+            scraper.log(
+                f"LOGIN REJEITADO pelo portal (mensagem da página): {msg_erro!r} — "
+                f"usuário {scraper.username}. Corrija as credenciais no frontend; "
+                f"sem retry para não bloquear a conta.",
+                level="ERROR", job_id=job_id,
+            )
+            raise LoginFailedError(f"LOGIN_REJEITADO: {msg_erro}")
+
         # Verificação de MFA (PO 2026-10-21): o portal pede um código enviado ao
         # usuário (validade de 24h no servidor). Se a tela aparecer, o código é
         # solicitado ao dono do job via banco (modal no frontend) — ver mfa_helper.
         _handle_mfa_if_needed(scraper, driver, job_id)
+
+        # Confirmação final de sucesso: tem que estar na área logada
+        url_final = (driver.current_url or "").lower()
+        if "prestador" not in url_final and "/fature" not in url_final:
+            msg = _capturar_mensagem_erro(driver) or "tela de login permaneceu após submit"
+            _dump_html_erro(driver, scraper.username)
+            scraper.log(
+                f"Login não concluiu (url={url_final}, mensagem={msg!r}).",
+                level="ERROR", job_id=job_id,
+            )
+            raise LoginFailedError(f"LOGIN_REJEITADO: {msg}")
 
         # Tratar notificações modais (mensagemImg) que aparecem após login
         _tratar_mensagens_iniciais(scraper, driver, job_id)
@@ -122,7 +199,8 @@ def _handle_mfa_if_needed(scraper: BaseScraper, driver, job_id):
             return
 
         scraper.log(
-            "Código MFA rejeitado — a tela de código continua visível",
+            f"Código MFA rejeitado — a tela de código continua visível. "
+            f"Mensagem da página: {_capturar_mensagem_erro(driver) or '(nenhuma)'}",
             level="WARN", job_id=job_id,
         )
         if ciclo >= mfa_helper.MFA_MAX_CYCLES:

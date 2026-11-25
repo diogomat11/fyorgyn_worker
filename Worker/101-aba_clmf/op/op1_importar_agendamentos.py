@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config.constants import AJAX_SCHEDULE_URL, ALLOWED_UNIT_IDS, STATUS_MAP
+from config.constants import AJAX_SCHEDULE_URL, ALLOWED_UNIT_IDS, STATUS_MAP, PAGAMENTOS_HOME_URL
 
 def run(scraper, job_data):
     job_id = job_data.get("job_id")
@@ -118,7 +118,7 @@ def run(scraper, job_data):
     pagamentos_map = {}
     try:
         scraper.log("Buscando listagem de pagamentos em /pagamentos/home para extrair nomes de convênios...", job_id=job_id)
-        pag_resp = scraper.session.get("https://abalarissamartinsferreira.com.br/pagamentos/home", timeout=15)
+        pag_resp = scraper.session.get(PAGAMENTOS_HOME_URL, timeout=15)
         if pag_resp.status_code == 200:
             pag_resp.encoding = pag_resp.apparent_encoding or "utf-8"
             html_text = pag_resp.text

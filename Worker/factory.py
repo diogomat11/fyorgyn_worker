@@ -28,6 +28,13 @@ class ScraperFactory:
              spec.loader.exec_module(goiania_module)
              return goiania_module.UnimedScraper(id_convenio=id_convenio, db=db, headless=headless, user_id=user_id)
 
+        if id_integrador == 9 or (id_integrador is None and id_convenio == 9): # AMIL (credenciado.amil.com.br)
+             target_file = os.path.join(worker_dir, "9-amil", "core", "scraper.py")
+             spec = importlib.util.spec_from_file_location("amil_scraper", target_file)
+             amil_module = importlib.util.module_from_spec(spec)
+             spec.loader.exec_module(amil_module)
+             return amil_module.AmilScraper(id_convenio=id_convenio, db=db, headless=headless, user_id=user_id)
+
         if id_convenio == 1: # BRADESCO
              target_file = os.path.join(worker_dir, "1-bradesco", "core", "scraper.py")
              spec = importlib.util.spec_from_file_location("bradesco_scraper", target_file)

@@ -547,6 +547,147 @@ class WebPlanClient:
         }
         return self._recurso_glosa_request("POST", url, headers=headers, json=payload)
 
+    def post_upload_temp_recurso_glosa(self, nome_arquivo, bytes_arquivo):
+        """
+        OP21 - POST /Upload/SendFile (multipart/form-data)
+        Faz o upload temporário do PDF para a pasta Temp do servidor WebPlan.
+        Retorna o PathFileName gerado pelo servidor (ex.: 'C:\\inetpub\\...\\temp\\...pdf').
+        """
+        from io import BytesIO
+
+        url = "https://novowebplanipasgo.facilinformatica.com.br/Upload/SendFile"
+        headers = self._recurso_glosa_headers()
+
+        try:
+            resp = self.session.post(
+                url,
+                files={"file": (nome_arquivo, BytesIO(bytes_arquivo), "application/pdf")},
+                data={"uniqueTempFolderId": ""},
+                headers=headers,
+                timeout=30,
+            )
+            if resp.status_code in (403, 429) or any(b in resp.text.lower() for b in ["bloquead", "bloqueio"]):
+                raise ValueError(f"Bloqueio momentâneo do portal IPASGO (HTTP {resp.status_code}): {resp.text[:200]}")
+
+            if resp.status_code in (502, 503):
+                raise ValueError(f"Portal IPASGO indisponível (HTTP {resp.status_code}): {resp.text[:200]}")
+
+            if 'text/html' in resp.headers.get('Content-Type', ''):
+                raise ValueError(
+                    f"Sessão Rejeitada no Upload/SendFile (Retornou HTML). "
+                    f"Status: {resp.status_code}. URL: {resp.url}"
+                )
+            resp.raise_for_status()
+            data = resp.json()
+            if isinstance(data, str):
+                data = json.loads(data)
+            if isinstance(data, dict) and data.get("HasError", False):
+                msg = data.get("Message") or data.get("ErrorMessage") or ""
+                if any(b in msg.lower() for b in ["bloqueio", "bloqueado", "limite", "excedid"]):
+                    raise ValueError(f"Bloqueio momentâneo do portal IPASGO: {msg}")
+                raise ValueError(f"API Error Upload/SendFile: {msg}")
+
+            path_file_name = data.get("Data") if isinstance(data, dict) else None
+            if not path_file_name:
+                raise ValueError(f"Upload/SendFile não retornou caminho temporário do arquivo. Resposta: {data}")
+
+            return str(path_file_name)
+        except Exception as e:
+            logging.error(f"Erro no Upload/SendFile do RecursoGlosa ({nome_arquivo}): {e}")
+            raise e
+
+    def post_save_file_recurso_glosa(self, protocolo, path_file_name, file_name):
+        """
+        OP21 - POST /RecursoGlosa/SaveFile
+        Vincula o arquivo previamente enviado ao Temp ao protocolo de recurso de glosa.
+        O payload é 'param' contendo o JSON em Base64 UTF-8 (mimetizando cryptography(model)).
+        """
+        import base64
+
+        url = "https://novowebplanipasgo.facilinformatica.com.br/RecursoGlosa/SaveFile"
+        headers = self._recurso_glosa_headers()
+        headers["Content-Type"] = "application/json;charset=UTF-8"
+
+        model = {
+            "NumeroProtocolo": int(protocolo),
+            "PathFileName": str(path_file_name),
+            "FileName": str(file_name),
+        }
+        json_compacto = json.dumps(model, separators=(",", ":"), ensure_ascii=False)
+        param_b64 = base64.b64encode(json_compacto.encode("utf-8")).decode("ascii")
+
+        payload = {"param": param_b64}
+
+        try:
+            resp = self.session.post(
+                url,
+                json=payload,
+                headers=headers,
+                timeout=30,
+            )
+            if resp.status_code in (403, 429) or any(b in resp.text.lower() for b in ["bloquead", "bloqueio"]):
+                raise ValueError(f"Bloqueio momentâneo do portal IPASGO (HTTP {resp.status_code}): {resp.text[:200]}")
+
+            if resp.status_code in (502, 503):
+                raise ValueError(f"Portal IPASGO indisponível (HTTP {resp.status_code}): {resp.text[:200]}")
+
+            if 'text/html' in resp.headers.get('Content-Type', ''):
+                raise ValueError(
+                    f"Sessão Rejeitada no RecursoGlosa/SaveFile (Retornou HTML). "
+                    f"Status: {resp.status_code}. URL: {resp.url}"
+                )
+            resp.raise_for_status()
+            data = resp.json()
+            if isinstance(data, str):
+                data = json.loads(data)
+            if isinstance(data, dict) and data.get("HasError", False):
+                msg = data.get("Message") or data.get("ErrorMessage") or ""
+                if any(b in msg.lower() for b in ["bloqueio", "bloqueado", "limite", "excedid"]):
+                    raise ValueError(f"Bloqueio momentâneo do portal IPASGO: {msg}")
+                raise ValueError(f"API Error RecursoGlosa/SaveFile: {msg}")
+
+            return data
+        except Exception as e:
+            logging.error(f"Erro no RecursoGlosa/SaveFile (protocolo {protocolo}, arquivo {file_name}): {e}")
+            raise e
+
+    def get_anexos_recurso_glosa(self, protocolo):
+        """
+        OP21 - GET /RecursoGlosa/GetAnexos?chaveCapa={protocolo}
+        Retorna lista de anexos vinculados ao protocolo no portal.
+        """
+        url = "https://novowebplanipasgo.facilinformatica.com.br/RecursoGlosa/GetAnexos"
+        headers = self._recurso_glosa_headers()
+        headers["Accept"] = "*/*"
+
+        try:
+            resp = self.session.get(
+                url,
+                params={"chaveCapa": str(protocolo)},
+                headers=headers,
+                timeout=30,
+            )
+            if resp.status_code in (403, 429) or any(b in resp.text.lower() for b in ["bloquead", "bloqueio"]):
+                raise ValueError(f"Bloqueio momentâneo do portal IPASGO (HTTP {resp.status_code}): {resp.text[:200]}")
+
+            if resp.status_code in (502, 503):
+                raise ValueError(f"Portal IPASGO indisponível (HTTP {resp.status_code}): {resp.text[:200]}")
+
+            if 'text/html' in resp.headers.get('Content-Type', ''):
+                raise ValueError(
+                    f"Sessão Rejeitada no RecursoGlosa/GetAnexos (Retornou HTML). "
+                    f"Status: {resp.status_code}. URL: {resp.url}"
+                )
+            resp.raise_for_status()
+            data = resp.json()
+            if isinstance(data, str):
+                data = json.loads(data)
+            return data if isinstance(data, list) else []
+        except Exception as e:
+            logging.error(f"Erro no RecursoGlosa/GetAnexos (protocolo {protocolo}): {e}")
+            raise e
+
+
     # ── Conferência de Faturamento (OP17 importação / OP18 confirmação) ──
 
     def _conferencia_headers(self, form=False):
@@ -679,3 +820,104 @@ class WebPlanClient:
                 if attempt == 2:
                     raise e
                 time.sleep(3)
+
+    def get_listar_anexos_guia(self, capa_lote_id, numero_guia):
+        """
+        OP17 - GET /ConferenciaFaturamento/ListarAnexosGuia
+          ?capaLoteId={protocolo}&numeroGuiaOperadora={guia}&_={ms}
+
+        Retorna o JSON do portal: {Data: [{Id, Data, Excluido, Nome, Tamanho, ...}], HasError, Message}.
+        """
+        url = "https://novowebplanipasgo.facilinformatica.com.br/ConferenciaFaturamento/ListarAnexosGuia"
+        params = {
+            "capaLoteId": str(capa_lote_id),
+            "numeroGuiaOperadora": str(numero_guia),
+            "_": int(time.time() * 1000),
+        }
+        for attempt in range(3):
+            try:
+                resp = self.session.get(
+                    url, params=params, headers=self._conferencia_headers(), timeout=60
+                )
+                if 'text/html' in resp.headers.get('Content-Type', ''):
+                    if attempt < 2:
+                        self.refresh_session()
+                        time.sleep(2)
+                        continue
+                    raise ValueError(
+                        f"Sessão Rejeitada no ListarAnexosGuia (Retornou HTML). "
+                        f"Status: {resp.status_code}. URL: {resp.url}"
+                    )
+                resp.raise_for_status()
+                data = resp.json()
+                if isinstance(data, str):
+                    data = json.loads(data)
+                if isinstance(data, dict) and data.get("HasError", False):
+                    raise ValueError(f"API Error ListarAnexosGuia: {data.get('Message')}")
+                return data
+            except Exception as e:
+                logging.error(f"Erro no ListarAnexosGuia (guia {numero_guia}): {e}")
+                if attempt == 2:
+                    raise e
+                time.sleep(2)
+
+    def post_anexar_arquivo_guia(self, capa_lote_id, numero_guia, nome_arquivo, bytes_arquivo):
+        """
+        OP19 - POST /ConferenciaFaturamento/AnexarArquivoGuia (multipart/form-data)
+
+        Upload do PDF como campo 'arquivo' (filename original preservado), com a
+        guia e a capa na query string — mesmo formato do envio feito pelo portal:
+          POST AnexarArquivoGuia?capaLoteId={protocolo}&numeroGuiaOperadora={guia}
+
+        Primeiro multipart do WebPlanClient: NÃO setar Content-Type manualmente
+        (o requests gera o boundary). Bytes são re-envolvoltos em BytesIO a cada
+        tentativa porque o stream se consome no POST.
+        """
+        from io import BytesIO
+
+        url = "https://novowebplanipasgo.facilinformatica.com.br/ConferenciaFaturamento/AnexarArquivoGuia"
+        params = {
+            "capaLoteId": str(capa_lote_id),
+            "numeroGuiaOperadora": str(numero_guia),
+        }
+        headers = self._conferencia_headers()  # sem form=True: sem Content-Type
+
+        # Sem loop interno de retry: cada execução do job OP19 equivale a 1 tentativa
+        # controlada pelo dispatcher (máx 3 tentativas antes de abortar).
+        try:
+            resp = self.session.post(
+                url,
+                params=params,
+                files={"arquivo": (nome_arquivo, BytesIO(bytes_arquivo), "application/pdf")},
+                headers=headers,
+                timeout=30,
+            )
+            if resp.status_code in (403, 429) or ("bloquead" in resp.text.lower() or "bloqueio" in resp.text.lower()):
+                raise ValueError(f"Bloqueio momentâneo do portal IPASGO (HTTP {resp.status_code}): {resp.text[:200]}")
+
+            if resp.status_code in (502, 503):
+                # Indisponibilidade (gateway) não é bloqueio, mas também justifica pausar a fila.
+                raise ValueError(f"Portal IPASGO indisponível (HTTP {resp.status_code}): {resp.text[:200]}")
+
+            if 'text/html' in resp.headers.get('Content-Type', ''):
+                # 401/500 com HTML = sessão rejeitada ou erro do servidor — o rótulo
+                # antigo ("Bloqueio momentâneo") induzia diagnóstico errado.
+                raise ValueError(
+                    f"Sessão Rejeitada no AnexarArquivoGuia (Retornou HTML). "
+                    f"Status: {resp.status_code}. URL: {resp.url}"
+                )
+            resp.raise_for_status()
+            data = resp.json()
+            if isinstance(data, str):
+                data = json.loads(data)
+            if isinstance(data, dict) and data.get("HasError", False):
+                msg = data.get("Message") or data.get("ErrorMessage") or ""
+                if any(b in msg.lower() for b in ["bloqueio", "bloqueado", "limite", "excedid"]):
+                    raise ValueError(f"Bloqueio momentâneo do portal IPASGO: {msg}")
+                raise ValueError(f"API Error AnexarArquivoGuia: {msg}")
+            return data
+        except Exception as e:
+            logging.error(
+                f"Erro no AnexarArquivoGuia (guia {numero_guia}, arquivo {nome_arquivo}): {e}"
+            )
+            raise e

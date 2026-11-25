@@ -1,17 +1,27 @@
 convenio:
   id: 101
   nome: "ABA_clmf"
-  url: "https://abalarissamartinsferreira.com.br/"
+  url: "https://app.abalarissamartinsferreira.com.br/"
   descricao: "Integrador de Agendamentos da Clínica Larissa Martins Ferreira"
+
+# Modelo de DOIS domínios (2026-11-21): painel NOVO (app.) = autenticação/SSO;
+# sistema ANTIGO (PHP com _ajax/*) = raiz do domínio, alvo das OPs.
+dominios:
+  app_url: "https://app.abalarissamartinsferreira.com.br"        # painel novo (API + SSO)
+  base_url: "https://abalarissamartinsferreira.com.br"           # sistema antigo (raiz, PHP)
 
 operacoes:
   op0_login:
-    descricao: "Autenticação via Selenium para captura de cookies de sessão"
-    parametros:
-      - login (user_email)
-      - senha (user_password)
-    tipo: "Selenium Chrome"
-    retorno: "Sessão armazenada no Scraper"
+    descricao: "Login HTTP puro (sem Selenium — login visual aposentado pelo portal): painel novo + SSO"
+    fluxo:
+      - "POST {app_url}/api/auth/login {email, senha} → token Bearer"
+      - "POST {app_url}/api/sso/emitir {destino} + Bearer → token SSO de uso único + url"
+      - "POST form do token na url → sistema antigo cria a sessão (PHPSESSID)"
+    sonda_sessao: "GET {base_url}{SSO_DESTINO} sem redirect — 200 = sessão viva (reusa)"
+    sso_destino: "env CLMF_SSO_DESTINO (default /prontuarios/home/status/1 — precisa estar no MENU da conta; 422 senão)"
+    tipo: "HTTP requests (sessão separada p/ o painel; cookies do domínio antigo injetados no driver via CDP)"
+    retorno: "{status, message, cookies: [nomes]} — falha → LOGIN_REJEITADO (fatal, circuit breaker 15 min)"
+    detalhes: "op0_login.md"
 
   op1_importar_agendamentos:
     descricao: "Requisita agendamentos via POST HTTP para Schedule.ajax.php"
@@ -21,9 +31,11 @@ operacoes:
       - data_inicio
       - data_fim
       - id_paciente (0 = todos)
+      - fixed (S/N — Agenda Fixa)
     filtros:
       - "schedule_local_id em [1, 3, 5]"
-    retorno: "Lista de agendamentos formatados"
+    retorno: "Lista de agendamentos formatados + atendimentos_excluidos"
+    detalhes: "op1_importar_agendamentos.md"
 
   op2_consultar_carteirinha:
     descricao: "Extrai carteirinhas do paciente via GET HTTP em /clients/create/{id_paciente}"

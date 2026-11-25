@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import importlib.util
 from datetime import datetime
 import json
@@ -46,7 +47,9 @@ class IpasgoScraper(BaseScraper):
         if login_val:
             self.username = str(login_val).strip()
 
-        pwd_raw = merged.get("password") or merged.get("senha")
+        # Atenção: em params da OP19 "senha" é a senha de 11 dígitos da GUIA,
+        # não a senha do portal! Priorizar senha_criptografada / password.
+        pwd_raw = merged.get("password")
         if not pwd_raw and merged.get("senha_criptografada"):
             try:
                 pwd_raw = decrypt_password(merged.get("senha_criptografada"))
@@ -143,6 +146,13 @@ class IpasgoScraper(BaseScraper):
         try:
             if self.module_path not in sys.path:
                 sys.path.insert(0, self.module_path)
+            # Cross-talk sequencial: um job de OUTRO convênio (ex. 1-bradesco)
+            # no MESMO processo deixa sys.modules['core'] apontando para o
+            # pacote DELE — o import abaixo bateria no pacote errado
+            # ("No module named 'core.module_reloader'"). Purga antes.
+            for _k in [k for k in list(sys.modules)
+                       if k in ("core", "config") or k.startswith("core.") or k.startswith("config.")]:
+                del sys.modules[_k]
             from core.module_reloader import reload_stale_modules
             reload_stale_modules(self.module_path, log=lambda m: self.log(m, level="WARN"))
         except Exception as reload_err:
@@ -153,6 +163,44 @@ class IpasgoScraper(BaseScraper):
         
         if not os.path.exists(op_path):
             raise FileNotFoundError(f"Operação {op_name} não encontrada em {op_path}")
+
+        # Cross-talk entre integradores: job anterior de OUTRO convênio no mesmo
+        # processo deixa 'config' (e módulos dele) cacheado em sys.modules — o
+        # import da OP resolveria o pacote errado (ex.: config do 102-caesan
+        # servindo o 6-ipasgo → ImportError em X_LOGIN_USERNAME). Purga módulos
+        # de QUALQUER Worker/<id>-* antes de carregar a OP (a OP é recarregada
+        # do disco; módulos da raiz do Worker ficam de fora).
+        #
+        # Incidente 2026-11-11 (jobs CAESAN 23711/23667): pacotes NAMESPACE
+        # (sem __init__.py) têm __file__=None e sobreviviam a esta purga — o
+        # 'config' namespace envenenado persistia entre jobs e `from config
+        # import settings` no op0 do 102-caesan levava o Chrome ao PORTAL
+        # ERRADO. A purga agora também examina cada entrada de __path__ de
+        # pacotes sem __file__ (config/ de 102-caesan e 6-ipasgo hoje têm
+        # __init__.py, mas processos vivos podem ainda carregar o namespace).
+        for _key in list(sys.modules):
+            _mod = sys.modules.get(_key)
+            if _mod is None:
+                continue
+            _caminhos = []
+            if getattr(_mod, "__file__", None):
+                _caminhos.append(os.path.abspath(_mod.__file__))
+            for _pth in getattr(_mod, "__path__", None) or []:
+                try:
+                    _caminhos.append(os.path.abspath(_pth))
+                except Exception:
+                    continue
+            if not _caminhos:
+                continue
+            for _abs in _caminhos:
+                _parts = _abs.lower().split(os.sep)
+                try:
+                    _i = next(i for i, p in enumerate(_parts)
+                              if p == "worker" and i + 1 < len(_parts) and _parts[i + 1][0].isdigit())
+                except StopIteration:
+                    continue
+                del sys.modules[_key]
+                break
 
         spec = importlib.util.spec_from_file_location(op_name, op_path)
         module = importlib.util.module_from_spec(spec)
@@ -227,6 +275,11 @@ class IpasgoScraper(BaseScraper):
             "16": "op16_enviar_recurso_glosa",
             "17": "op17_importar_conferencia",
             "18": "op18_conferir_faturamento",
+            "19": "op19_anexar_arquivo_guia",
+            "20": "op20_validar_codigo_beneficiario",
+            "op20_validar_codigo_beneficiario": "op20_validar_codigo_beneficiario",
+            "21": "op21_anexar_recurso_glosa",
+            "op21_anexar_recurso_glosa": "op21_anexar_recurso_glosa",
             "13_poll": "op13_poll_lote",
             "Execução": "op4_confirma_guia",
             "execucao": "op4_confirma_guia",
@@ -246,7 +299,73 @@ class IpasgoScraper(BaseScraper):
             else:
                 op_name = f"op{rotina}"
 
-        for attempt in range(self.max_retries):
+        # Pre-flight anexos (OP19 e OP21): se o lote já teve >= 3 falhas/abortos sem reprocessamento recente,
+        # aborta imediatamente sem abrir/ocupar o Selenium.
+        is_op19 = str(rotina) in ("19", "op19_anexar_arquivo_guia")
+        is_op21 = str(rotina) in ("21", "op21_anexar_recurso_glosa")
+        is_op_anexo = is_op19 or is_op21
+        rotinas_anexo = ["19", "op19_anexar_arquivo_guia"] if is_op19 else (["21", "op21_anexar_recurso_glosa"] if is_op21 else [])
+        protocolo_op19 = str(job_data.get("protocolo") or job_data.get("capa") or "").strip() if is_op_anexo else ""
+        if is_op_anexo and self.db and protocolo_op19:
+            try:
+                from models import Job as JobModel
+                from datetime import timezone
+                all_op_anexo = self.db.query(JobModel).filter(
+                    JobModel.rotina.in_(rotinas_anexo),
+                    JobModel.id_convenio == 6,
+                ).all()
+                lote_jobs = []
+                for j_row in all_op_anexo:
+                    p_raw = j_row.params
+                    p_d = json.loads(p_raw) if isinstance(p_raw, str) else (p_raw or {})
+                    if str(p_d.get("protocolo") or p_d.get("capa") or "").strip() == protocolo_op19:
+                        lote_jobs.append(j_row)
+                # Conta falhas ou verifica se algum já esgotou 3 tentativas.
+                # Jobs abortados em cascata ("não foi tentado") NÃO são evidência
+                # de portal bloqueado: são efeito, não causa. Sem esse filtro,
+                # reprocessar 1 anexo re-abortava na hora sem nem tocar no portal.
+                # Falha soft (401/500) isolada também não aborta — o retry do
+                # dispatcher recupera; só bloqueio hard ou exaustão (attempts>=3).
+                def _falha_real(j_row):
+                    if j_row.status != "error":
+                        return False
+                    m = (j_row.error_message or "").lower()
+                    return not (
+                        m.startswith("abortado em cascata")
+                        or m.startswith("abortado -")
+                        or "não foi tentado" in m
+                    )
+                def _hard(m):
+                    low = (m or "").lower()
+                    return bool(re.search(r"\b(403|429)\b", low)) or any(
+                        k in low for k in ("bloqueio", "bloqueado", "rate limit", "too many requests", "limite de requisições")
+                    )
+                erros_lote = [j for j in lote_jobs if _falha_real(j)]
+                ja_abortado = any((j.attempts or 0) >= 3 for j in erros_lote) or any(
+                    _hard(j.error_message) for j in erros_lote
+                )
+                if ja_abortado:
+                    now_utc = datetime.now(timezone.utc)
+                    for j_row in lote_jobs:
+                        if j_row.status != "success":
+                            j_row.status = "error"
+                            j_row.attempts = max(3, j_row.attempts or 0)
+                            j_row.locked_by = None
+                            if not j_row.error_message or "abortad" not in j_row.error_message.lower():
+                                j_row.error_message = "Abortado após 3 tentativas (falha do portal em outro job do lote). Reenvio automático após pausa."
+                            j_row.updated_at = now_utc
+                    self.db.commit()
+                    raise RuntimeError("Abortado após 3 tentativas (falha do portal em outro job do lote). Reenvio automático após pausa.")
+            except RuntimeError as pre_abort:
+                error_msg = str(pre_abort)
+                execution.status = "error"
+            except Exception as pre_e:
+                try:
+                    self.db.rollback()
+                except Exception:
+                    pass
+
+        for attempt in range(0 if execution.status == "error" else self.max_retries):
             try:
                 # Check session
                 need_login = attempt > 0
@@ -276,10 +395,20 @@ class IpasgoScraper(BaseScraper):
                 break
             except Exception as e:
                 error_msg = str(e)
+                # Para OP19/OP21 (anexos) ou bloqueio do IPASGO, fail-fast:
+                # (\b evita falso positivo com dígitos de guia/senha na mensagem)
+                if is_op_anexo or (
+                    re.search(r"\b(403|429)\b", error_msg.lower())
+                    or any(b in error_msg.lower() for b in ["bloqueio", "bloqueado"])
+                ):
+                    self.log(f"Fail-fast para OP anexos/bloqueio IPASGO: {error_msg}", level="WARN", job_id=job_id)
+                    execution.status = "error"
+                    break
                 self.log(f"Attempt {attempt+1} failed: {error_msg}", level="ERROR", job_id=job_id)
                 if attempt < self.max_retries - 1:
                     time.sleep(5)
                 else:
+                    self.log(f"Fail-fast para OP anexos/bloqueio IPASGO: {error_msg}", level="WARN", job_id=job_id)
                     execution.status = "error"
 
         execution.end_time = datetime.now()
@@ -295,6 +424,50 @@ class IpasgoScraper(BaseScraper):
         except: self.db.rollback()
         
         if execution.status == "error":
+            if is_op_anexo and self.db:
+                try:
+                    from models import Job as JobModel
+                    from datetime import timezone
+                    now_utc = datetime.now(timezone.utc)
+                    curr_j = self.db.query(JobModel).filter(JobModel.id == job_id).first()
+                    all_op_anexo = self.db.query(JobModel).filter(
+                        JobModel.rotina.in_(rotinas_anexo),
+                        JobModel.id_convenio == 6,
+                    ).all()
+                    lote_jobs = []
+                    for j_row in all_op_anexo:
+                        p_raw = j_row.params
+                        p_d = json.loads(p_raw) if isinstance(p_raw, str) else (p_raw or {})
+                        if not protocolo_op19 or str(p_d.get("protocolo") or p_d.get("capa") or "").strip() == protocolo_op19:
+                            lote_jobs.append(j_row)
+                    # Cascata imediata só para hard (403/429/rate-limit). Soft
+                    # (401/500/timeout/sessão) espera exaurir as 3 tentativas —
+                    # falha transiente isolada não trava a fila (retry recupera).
+                    _low = (error_msg or "").lower()
+                    is_hard = bool(re.search(r"\b(403|429)\b", _low)) or any(
+                        b in _low for b in [
+                            "bloqueio", "bloqueado", "rate limit",
+                            "too many requests", "limite de requisições",
+                        ]
+                    )
+                    curr_attempts = (curr_j.attempts or 1) if curr_j else 1
+                    if is_hard or curr_attempts >= 3:
+                        for j_row in lote_jobs:
+                            if j_row.status != "success":
+                                j_row.status = "error"
+                                j_row.attempts = max(3, j_row.attempts or 0)
+                                j_row.locked_by = None
+                                if j_row.id == job_id:
+                                    j_row.error_message = f"Abortado após {j_row.attempts} tentativa(s): {(error_msg or '')[:450]}"
+                                elif not j_row.error_message or "abortad" not in j_row.error_message.lower():
+                                    j_row.error_message = f"Abortado em cascata — falha do portal no job #{job_id}. Este anexo não foi tentado. Reenvio automático após pausa."
+                                j_row.updated_at = now_utc
+                        self.db.commit()
+                except Exception:
+                    try:
+                        self.db.rollback()
+                    except Exception:
+                        pass
             raise Exception(f"Job failed internally: {error_msg}")
             
         return results

@@ -1,6 +1,6 @@
 """
 OP6 — Atualizar Relatorio Clinico Mensal (RC) e baixar PDF
-Convenio: ABA_CLMF (101) | Portal: https://abalarissamartinsferreira.com.br
+Convenio: ABA_CLMF (101) | Portal: https://app.abalarissamartinsferreira.com.br
 
 Replica fiel de clmf_hub_basic/worker/Worker/clmf_scraper.py:166-462 (CLMFScraper.atualizar_rc
 + helpers _post_gravar_rc / _post_gerar_pdf / _download_pdf), adaptada ao padrao BaseScraper

@@ -62,6 +62,8 @@ class Carteirinha(Base):
     is_temporary = Column(Boolean, default=False)
     expires_at = Column(DateTime(timezone=True), nullable=True)
     cid = Column(Text, nullable=True)
+    codigo_benef_validado_em = Column(DateTime(timezone=True), nullable=True)
+    codigo_benef_status = Column(Text, nullable=True)
 
     # Nota: jobs e logs estão no schema 'worker' (schema diferente). Relacionamentos ORM
     # cross-schema não são suportados com FKs convencionais. Use queries manuais para buscar
@@ -133,6 +135,10 @@ class BaseGuia(Base):
     # JSON {tipo_json, guias} resultado da validacao de vinculo do prestador
     # (Unimed Goiania via getErrosSapia). NULL quando nao validado.
     valida_prestador = Column(JSON, nullable=True)
+    # AMIL (integrador 9): espelho da coluna criada pela migration 0120 do hub
+    # — pedidoConfirmado do detalhe (plano D2). O pacote de faturamento não é
+    # coluna: o hub cadastra o vínculo em public.procedimentos (coluna faturamento).
+    status_token = Column(Boolean, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -466,6 +472,8 @@ class FaturamentoLote(Base):
     dataRealizacao = Column(Date)
     Guia = Column(Text)
     StatusConferencia = Column(Integer)
+    status_conferencia = Column(Text)
+    tem_anexo = Column(Boolean, default=False)
     ValorProcedimento = Column(Float)
     cod_procedimento_fat = Column(Text, nullable=True)
     agendamento_id = Column(Integer, ForeignKey("agendamentos.id_agendamento", ondelete="SET NULL"), nullable=True, index=True)

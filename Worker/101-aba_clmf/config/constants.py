@@ -3,16 +3,28 @@
 # Seletores, URLs e mapeamentos do portal ABA
 # ============================================
 
-# URLs
-BASE_URL = "https://abalarissamartinsferreira.com.br"
-LOGIN_URL = f"{BASE_URL}/"
+import os
+
+# URLs — modelo de DOIS domínios (portal mudou; ref. clmf_hub_basic 2026-11-21)
+# Painel novo (app.): autenticação via API (Bearer) — o login visual antigo
+# (emailAba/senhaAba/btnEntrarAba) foi aposentado pelo portal. A sessão do
+# sistema antigo (PHP, na RAIZ) nasce da troca de um token SSO de uso único
+# (mesmo fluxo do botão "irParaOAntigo" do painel: js/app.js).
+APP_URL = "https://app.abalarissamartinsferreira.com.br"          # painel novo
+BASE_URL = "https://abalarissamartinsferreira.com.br"             # sistema antigo (PHP)
+LOGIN_URL = f"{APP_URL}/"                                         # tela de login do painel
+API_LOGIN_URL = f"{APP_URL}/api/auth/login"       # POST {email, senha} → {token, usuario}
+API_SSO_EMITIR_URL = f"{APP_URL}/api/sso/emitir"  # POST {destino} + Bearer → {url, token}
+# Tela pós-SSO: precisa estar no MENU da conta (a API valida — 422 "Tela não
+# encontrada no seu menu."). Ajustável por env para contas com permissões
+# diferentes (CLMF_SSO_DESTINO).
+SSO_DESTINO = os.getenv("CLMF_SSO_DESTINO", "/prontuarios/home/status/1")
+LOGIN_PROBE_TIMEOUT = 10          # sonda GET / sem seguir redirect (is_logged_in)
+AJAX_TIMEOUT = 60                 # POSTs de login/SSO e chamadas AJAX das OPs
+
 AJAX_SCHEDULE_URL = f"{BASE_URL}/_ajax/Schedule.ajax.php"
 CLIENT_DETAIL_URL = f"{BASE_URL}/clients/create"  # + /{id_paciente}
-
-# Login Selectors (Selenium)
-LOGIN_FIELD_EMAIL = 'user_email'          # name="user_email"
-LOGIN_FIELD_PASSWORD = 'user_password'    # name="user_password"
-LOGIN_BUTTON_XPATH = "/html/body/div[1]/div/form/button"
+PAGAMENTOS_HOME_URL = f"{BASE_URL}/pagamentos/home"
 
 # Timeouts
 DEFAULT_TIMEOUT = 15

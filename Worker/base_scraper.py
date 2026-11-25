@@ -37,7 +37,9 @@ class BaseScraper(ABC):
         if login_val:
             self.username = str(login_val).strip()
 
-        pwd_raw = merged.get("password") or merged.get("senha")
+        # Atenção: em params da OP19 "senha" é a senha de 11 dígitos da GUIA,
+        # não a senha do portal! Priorizar senha_criptografada / password.
+        pwd_raw = merged.get("password")
         if not pwd_raw and merged.get("senha_criptografada"):
             try:
                 pwd_raw = decrypt_password(merged.get("senha_criptografada"))

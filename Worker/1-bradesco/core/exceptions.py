@@ -44,3 +44,17 @@ class MfaMaxCyclesError(MfaError):
     """Código MFA inválido em todos os ciclos disponíveis (máx. 2)."""
     def __init__(self, message="MFA_MAX_CYCLES: código de verificação inválido em todas as tentativas"):
         super().__init__(message)
+
+
+class LoginFailedError(Exception):
+    """O portal REJEITOU as credenciais (mensagem capturada da própria página).
+
+    Fatal — SEM retry: repetir a mesma senha só multiplica tentativas erradas
+    no portal e pode BLOQUEAR a conta (incidente: usuário bloqueado por
+    retries com senha antiga snapshotada nos params). A mensagem original do
+    portal (ex.: "Usuário ou senha inválidos", "conta bloqueada") é incluída
+    para o usuário corrigir no frontend.
+    """
+    def __init__(self, message):
+        super().__init__(message)
+        self.message = message

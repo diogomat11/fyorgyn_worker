@@ -78,7 +78,8 @@ def classificar_fetch(http_status: int, parsed) -> str:
         if isinstance(parsed, list):
             return "ok_com_itens" if len(parsed) > 0 else "ok_vazio"
         return "invalido"
-    if http_status in (401, 403):
+    if http_status in (401, 403, -401):
+        # -401: HTTP 0 instantâneo com navegador redirecionado ao login (CORS)
         return "auth"
     return "transiente"
 
@@ -134,6 +135,74 @@ def run(scraper: "BaseScraper", job_data: dict) -> list:
         url_base = "https://portal.orizon.com.br/fature/prestador.html#/guias"
         scraper.log(f"Acessando URL base do Fature: {url_base}", job_id=job_id)
         driver.get(url_base)
+
+        # Incidente 26223/26228: sessão expirada → portal redireciona para o
+        # login (Keycloak, acesso-restrito, SSO) e o fetch JS executado em
+        # origem errada morre instantâneo (HTTP 0 'Failed to fetch'). Em vez de
+        # adivinhar padrões de URL de login, checagem POSITIVA: após o get, o
+        # navegador TEM que estar no SPA do Fature. Qualquer outra URL
+        # (login/Keycloak/SSO/erro do Chrome) = sessão expirada.
+        url_apos_load = (driver.current_url or "").lower()
+        no_spa_fature = not (
+            url_apos_load.startswith("https://portal.orizon.com.br/fature/")
+            or url_apos_load.startswith("https://portal.orizon.com.br/fature/prestador.html")
+        )
+        if no_spa_fature:
+            scraper.log(
+                f"Após carregar o Fature o navegador NÃO está no SPA (url={url_apos_load}) — "
+                f"redirecionamento de login/SSO ou erro de página. Sessão inválida.",
+                level="ERROR", job_id=job_id,
+            )
+            raise SessionExpiredError()
+
+        # Diagnóstico (incidente 26228): 'Failed to fetch' instantâneo SEM URL de
+        # login → suspeita de página de erro do Chrome (DNS/proxy/perfil), onde a
+        # URL permanece a original mas o contexto JS não executa fetch. Probe
+        # same-origin: se nem a própria origem responde, o contexto está quebrado.
+        try:
+            diag = driver.execute_script("""
+                var origin = window.location.origin;
+                var probe = new XMLHttpRequest();
+                probe.open('GET', origin + '/fature/prestador.html', false);  // síncrono
+                try { probe.send(); } catch (e) {}
+                return {
+                    href: window.location.href,
+                    origin: origin,
+                    readyState: document.readyState,
+                    title: document.title,
+                    probeStatus: probe.status,
+                    bodyLen: (document.body && document.body.innerHTML) ? document.body.innerHTML.length : 0
+                };
+            """)
+            # fetch no-cors ao domínio da API: resolve (opaque) = rede OK e a falha
+            # é CORS; rejeita = DNS/rede quebrada no navegador.
+            api_reachable = None
+            try:
+                api_reachable = driver.execute_async_script("""
+                    var cb = arguments[arguments.length - 1];
+                    fetch(arguments[0], {mode: 'no-cors', cache: 'no-store'})
+                        .then(function() { cb('reachable'); })
+                        .catch(function() { cb('unreachable'); });
+                """, FATURE_API_BASE + "/Status_Guia/Get?x=1", 10000)
+            except Exception:
+                api_reachable = "probe_error"
+            scraper.log(
+                f"Diagnóstico de contexto: href={diag.get('href')} readyState={diag.get('readyState')} "
+                f"title={diag.get('title')!r} probe_same_origin={diag.get('probeStatus')} "
+                f"api_no_cors={api_reachable} bodyLen={diag.get('bodyLen')}",
+                job_id=job_id,
+            )
+            if diag.get("probeStatus") == 0:
+                scraper.log(
+                    "Probe same-origin também falhou (status 0) — contexto do navegador quebrado "
+                    "(página de erro do Chrome: DNS/proxy/perfil). Reciclando driver.",
+                    level="ERROR", job_id=job_id,
+                )
+                raise SessionExpiredError()  # dispara reciclagem do driver pela escada
+        except SessionExpiredError:
+            raise
+        except Exception as e:
+            scraper.log(f"Probe de diagnóstico falhou (ignorando): {e}", level="WARN", job_id=job_id)
 
         try:
             aguardar_elemento(driver, By.ID, "buscarGuias", timeout=15)
@@ -252,8 +321,26 @@ def _fetch_json(scraper, driver, job_id, url: str) -> Tuple[Optional[list], int,
         if http_status in (401, 403):
             scraper.log(f"Sessão expirada no Faturi (HTTP {http_status}: {str(body)[:80]!r})", level="ERROR", job_id=job_id)
             return None, dur_ms, http_status
-        # transiente (0 = rede/timeout, 429, 5xx) — retry se ainda há tentativas
-        scraper.log(f"Falha transiente HTTP {http_status} ({dur_ms}ms){' — retentando' if tentativa < FATURE_FETCH_RETRIES else ''}", level="WARN", job_id=job_id)
+        # transiente (0 = rede/timeout, 429, 5xx) — retry se ainda há tentativas.
+        # HTTP 0 instantâneo (CORS/origem errada): o navegador pode ter sido
+        # redirecionado ao login DEPOIS do load inicial (incidente 26223) —
+        # confere a URL antes de desperdiçar a cascata inteira.
+        if http_status == 0 and dur_ms < 100:
+            url_agora = (driver.current_url or "").lower()
+            if "login" in url_agora or "keycloak" in url_agora or "/acesso-restrito" in url_agora:
+                scraper.log(
+                    f"Fetch bloqueado instantaneamente (HTTP 0, {dur_ms}ms) com navegador em {url_agora} — sessão expirada.",
+                    level="ERROR", job_id=job_id,
+                )
+                return None, dur_ms, -401
+            scraper.log(
+                f"HTTP 0 instantâneo ({dur_ms}ms) com navegador em {url_agora} — sem redirect de login; "
+                f"verificar contexto da página (diagnóstico no início da OP).",
+                level="WARN", job_id=job_id,
+            )
+        scraper.log(f"Falha transiente HTTP {http_status} ({dur_ms}ms)"
+                    f"{f' — {str(body)[:60]!r}' if http_status == 0 and body else ''}"
+                    f"{' — retentando' if tentativa < FATURE_FETCH_RETRIES else ''}", level="WARN", job_id=job_id)
     return None, dur_ms, http_status
 
 
@@ -325,7 +412,7 @@ def _fetch_via_js(driver, url: str, timeout_s: int):
     })
     .catch(function(err) {
         clearTimeout(timer);
-        callback({status: 0, body: null});
+        callback({status: 0, body: (err && err.message) ? err.message : 'network error'});
     });
     """
     result = driver.execute_async_script(script, url, int(timeout_s * 1000))

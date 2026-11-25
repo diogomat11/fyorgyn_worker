@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 import time
 import requests
 import logging
@@ -263,6 +264,57 @@ def get_job_login(db, job):
     return login
 
 
+# ── Circuit breaker de login (incidente: conta BLOQUEADA por retries) ──
+# Um job com LOGIN_REJEITADO (portal recusou credenciais — mensagem capturada
+# da própria página pelo op0_login) arma o breaker para o par
+# (user_id, id_convenio): os demais jobs ficam PENDING (não despachados) pelo
+# cooldown. Após o cooldown, UM job-probe é liberado (half-open); se falhar de
+# novo, o novo erro re-arma o breaker por mais um cooldown. Assim o sistema
+# faz no máximo 1 tentativa de login por janela — impossível bloquear a conta
+# por metralhadora de retries. Login bem-sucedido não toca o breaker (o erro
+# antigo perde efeito quando o probe passa e não há erro novo).
+LOGIN_FAILURE_COOLDOWN_S = 15 * 60
+_breaker_last_log = {}
+
+
+def _login_breaker_aberto(db, job) -> bool:
+    """True se o par (user_id, id_convenio) do job está em cooldown de falha
+    de login. Jobs retidos permanecem pending — nada é perdido."""
+    try:
+        from sqlalchemy import func as _func, or_ as _or
+        trip = db.query(_func.max(Job.updated_at)).filter(
+            Job.user_id == job.user_id,
+            Job.id_convenio == job.id_convenio,
+            Job.status == "error",
+            _or(
+                Job.error_message.like("LOGIN_REJEITADO%"),
+                Job.error_message.like("%PermanentError:%"),
+            ),
+        ).scalar()
+        if trip is None:
+            return False
+        from datetime import datetime as _dt, timezone as _tz
+        if trip.tzinfo is None:
+            trip = trip.replace(tzinfo=_tz.utc)
+        aberto = (_dt.now(_tz.utc) - trip).total_seconds() < LOGIN_FAILURE_COOLDOWN_S
+        if aberto:
+            chave = (job.user_id, job.id_convenio)
+            agora = time.time()
+            if agora - _breaker_last_log.get(chave, 0) > 60:
+                _breaker_last_log[chave] = agora
+                restante = int((LOGIN_FAILURE_COOLDOWN_S - (_dt.now(_tz.utc) - trip).total_seconds()) / 60) + 1
+                logger.warning(
+                    f"[LOGIN-BREAKER] Jobs do user {job.user_id} (convênio {job.id_convenio}) "
+                    f"RETIDOS como pending: login rejeitado pelo portal há menos de "
+                    f"{LOGIN_FAILURE_COOLDOWN_S // 60}min (~{restante}min restantes). "
+                    f"Corrija as credenciais no frontend; um job-probe será liberado após o cooldown."
+                )
+        return aberto
+    except Exception as e:
+        logger.error(f"[LOGIN-BREAKER] Erro no check (liberando job {job.id}): {e}")
+        return False
+
+
 # Keep for backward compatibility
 def get_pending_job(db, allowed_convenio_ids=None):
     jobs = get_ranked_pending_jobs(db, limit=50)
@@ -279,12 +331,19 @@ def retry_failed_jobs(db):
         # Add a 20s cooldown so rapid failures don't instantly loop the queue
         threshold = datetime.now(timezone.utc) - timedelta(seconds=20)
         from sqlalchemy import or_
+        # LOGIN_REJEITADO/PermanentError/FATURA_SEM_CREDENCIAIS são FATAIS
+        # (credencial errada re-tentada = metralhadora de logins no portal =
+        # bloqueio da conta). Nunca ressuscitar — requeue manual após corrigir
+        # a credencial no frontend.
         failed_jobs = db.query(Job).filter(
             Job.status == "error",
             or_(Job.attempts == None, Job.attempts < 3),
-            Job.updated_at < threshold
+            Job.updated_at < threshold,
+            ~Job.error_message.like("LOGIN_REJEITADO%"),
+            ~Job.error_message.like("%PermanentError:%"),
+            ~Job.error_message.like("FATURA_SEM_CREDENCIAIS%"),
         ).all()
-        
+
         if failed_jobs:
             logger.info(f"Retrying {len(failed_jobs)} failed jobs...")
             for job in failed_jobs:
@@ -336,6 +395,17 @@ def recover_stuck_jobs(db):
         # acomoda jobs longos de scraping (OP4 ≈ 2h40m para 5k+ guias) — jobs vivos
         # renovam updated_at via heartbeat do worker (chunks do OP4 / _bump_job_heartbeat).
         stuck_minutes = int(os.environ.get("STUCK_JOB_MINUTES", "180") or 180)
+        # OP19 saudável leva 1-2min (login + bootstrap + upload); o OP19 agora
+        # renova updated_at entre fases. 60s abortava jobs em execução normal.
+        op19_stuck = db.query(Job).filter(Job.status == "processing", Job.id_convenio == 6, Job.rotina.in_(["19", "op19_anexar_arquivo_guia"]), Job.updated_at < (datetime.now(timezone.utc) - timedelta(seconds=180))).all()
+        for oj in op19_stuck:
+            oj.status = "error"
+            oj.attempts = max(3, oj.attempts or 0)
+            oj.locked_by = None
+            oj.error_message = "Timeout no IPASGO (OP19 sem atualização há >180s). Reenvio automático após pausa."
+            oj.updated_at = datetime.now(timezone.utc)
+        if op19_stuck:
+            db.commit()
         threshold = datetime.now(timezone.utc) - timedelta(minutes=stuck_minutes)
         stuck_jobs = db.query(Job).filter(
             Job.status == "processing",
@@ -575,6 +645,10 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 current_job.status = "success"
                 current_job.locked_by = None
                 current_job.result_data = data
+                # Limpa erro residual: job que falhou, foi abortado em cascata e
+                # depois concluiu mantinha error_message de "bloqueio IPASGO",
+                # deixando o banner de bloqueio detectado para sempre no lote.
+                current_job.error_message = None
                 current_job.updated_at = datetime.now(timezone.utc)
                 results = data.get("data", [])
                 
@@ -681,9 +755,71 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
 
                 # Regra PO (plano_mfa_bradesco D4): código MFA expira — retry automático
                 # dispararia novo pedido de código sem ninguém olhando. Fatal.
+                # Regra OP19 (Anexos IPASGO): após 3 tentativas ou em caso de bloqueio momentâneo do portal,
+                # aborta o job e interrompe a fila de anexos pendentes para reprocessamento posterior.
+                if str(rotina) in ("19", "op19_anexar_arquivo_guia"):
+                    # Cascata imediata apenas para bloqueio hard (403/429/rate-limit).
+                    # Falhas soft (401/500/timeout/sessão) seguem o ciclo de 3
+                    # tentativas — a condição attempts >= 3 abaixo faz a cascata
+                    # na exaustão. \b impede falso positivo com dígitos de
+                    # guia/senha/tamanho dentro da mensagem.
+                    _low = err_msg.lower()
+                    is_bloqueio = (
+                        re.search(r"\b(403|429)\b", _low) is not None
+                        or any(b in _low for b in [
+                            "bloqueio", "bloqueado",
+                            "rate limit", "too many requests", "limite de requisições",
+                        ])
+                    )
+                    if (current_job.attempts or 0) >= 3 or is_bloqueio:
+                        # Preserva o contador de auto-retry do backend (worker_service):
+                        # ele lê "[auto-retry N/5]" para limitar ciclos infinitos.
+                        _m_auto = re.search(r"\[auto-retry (\d+)/5\]", str(current_job.error_message or ""))
+                        _auto_tag = f" [auto-retry {_m_auto.group(1)}/5]" if _m_auto else ""
+                        current_job.attempts = max(3, current_job.attempts or 0)
+                        current_job.error_message = f"Abortado após {current_job.attempts} tentativa(s): {err_msg}{_auto_tag}"
+                        try:
+                            proto = params_dict.get("protocolo")
+                            if proto:
+                                outros_pendentes = db.query(Job).filter(
+                                    Job.rotina.in_(["19", "op19_anexar_arquivo_guia"]),
+                                    Job.status == "pending",
+                                    Job.id != current_job.id
+                                ).all()
+                                abortados_count = 0
+                                for op_j in outros_pendentes:
+                                    p = op_j.params if isinstance(op_j.params, dict) else (_json.loads(op_j.params) if op_j.params else {})
+                                    if str(p.get("protocolo") or "").strip() == str(proto).strip():
+                                        op_j.status = "error"
+                                        op_j.error_message = (
+                                            f"Abortado em cascata — falha do portal no job #{current_job.id}. "
+                                            "Este anexo não foi tentado. Reenvio automático após pausa."
+                                        )
+                                        op_j.attempts = max(3, op_j.attempts or 0)
+                                        op_j.locked_by = None
+                                        op_j.updated_at = datetime.now(timezone.utc)
+                                        abortados_count += 1
+                                if abortados_count > 0:
+                                    logger.warning(f"[IPASGO CASCATA] Abortados {abortados_count} jobs pendentes de anexo para protocolo {proto}.")
+                                    db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="WARN",
+                                               message=f"[IPASGO CASCATA] Abortados {abortados_count} outros jobs pendentes do lote {proto} após {current_job.attempts} tentativas (bloqueio do portal)."))
+                                    db.commit()
+                        except Exception as abort_err:
+                            logger.error(f"Erro ao abortar fila de anexos: {abort_err}")
+
                 if "MFA_TIMEOUT" in err_msg or "MFA_CANCELLED" in err_msg or "MFA_MAX_CYCLES" in err_msg:
                     current_job.attempts = max(3, current_job.attempts or 0)
-                
+
+                # FATAL: portal recusou credenciais (mensagem capturada da
+                # página) ou credencial do contexto ausente. Re-tentar a mesma
+                # senha multiplica logins errados e BLOQUEIA a conta (incidentes
+                # 26219+). attempts=3 impede o retry_failed_jobs de ressuscitar.
+                if (err_msg.startswith("LOGIN_REJEITADO")
+                        or err_msg.startswith("FATURA_SEM_CREDENCIAIS")
+                        or err_msg.startswith("AUTORIZE_SEM_CREDENCIAIS")
+                        or "PermanentError:" in err_msg):
+                    current_job.attempts = max(3, current_job.attempts or 0)
+
                 # Log the full JSON response for debugging
                 try:
                     err_json_str = _json.dumps(data, ensure_ascii=False, default=str)[:2000]
@@ -719,6 +855,9 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                     current_job.status = "error"
                     current_job.locked_by = None
                     current_job.updated_at = datetime.now(timezone.utc)
+                    # Mensagem no job (antes ficava NULL — diagnóstico só no log):
+                    # fingerprint "Worker offline" identificável no banco.
+                    current_job.error_message = "WORKER_OFFLINE: Connection Refused — servidor worker inacessível (verificar frota)."
                     db.add(Log(job_id=job_id, carteirinha_id=carteirinha_id, user_id=user_id, level="ERROR", message="Worker is Offline (Connection Refused)."))
                     db.commit()
             except: pass
@@ -744,6 +883,14 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                 # Limpar só depois de marcar idle: o heartbeat só envia current_job_id
                 # quando status=="busy", então nunca reporta um job já finalizado.
                 status_map[url]["last_job"] = None
+
+    # ── Pacing OP19 (anexos IPASGO) ──────────────────────────────────────────
+    # Uploads paralelos contra o portal derrubam a sessão (rajada de 401/500
+    # logo após 5-10 anexos). Serializa: 1 job OP19 em voo + intervalo mínimo
+    # entre dispatches. Outras rotinas não são afetadas.
+    _OP19_ROTINAS = ("19", "op19_anexar_arquivo_guia")
+    _OP19_PACING_SECONDS = int(os.environ.get("OP19_PACING_SECONDS", "15") or 15)
+    _op19_state = {"last_dispatch": 0.0}
 
     while True:
         db = SessionLocal()
@@ -947,6 +1094,25 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                     return idle_servers[0]
                 
                 for job in ranked_jobs:
+                    # ── Circuit breaker de login: par (user, convênio) com login
+                    #    rejeitado recente fica RETIDO como pending (sem dispatch)
+                    #    — evita metralhadora de logins errados e bloqueio da conta
+                    if _login_breaker_aberto(db, job):
+                        continue
+
+                    # ── Pacing OP19: 1 em voo + intervalo mínimo entre dispatches ──
+                    if str(job.rotina) in _OP19_ROTINAS:
+                        if time.time() - _op19_state["last_dispatch"] < _OP19_PACING_SECONDS:
+                            continue
+                        op19_em_voo = db.query(Job).filter(
+                            Job.rotina.in_(_OP19_ROTINAS),
+                            Job.id_convenio == 6,
+                            Job.status.in_(["processing", "running"]),
+                            Job.id != job.id,
+                        ).first()
+                        if op19_em_voo is not None:
+                            continue
+
                     idle = [s for s in available_servers if s not in dispatched_servers]
                     if not idle:
                         break
@@ -1007,6 +1173,8 @@ def run_dispatcher(server_urls_str=None, stagger=15, log_queue=None, cmd_queue=N
                         locked_job.attempts = (locked_job.attempts or 0) + 1
                         locked_job.updated_at = datetime.now(locked_job.created_at.tzinfo) if (locked_job.created_at and locked_job.created_at.tzinfo) else datetime.now(timezone.utc)
                         db.commit()
+                        if str(locked_job.rotina) in _OP19_ROTINAS:
+                            _op19_state["last_dispatch"] = time.time()
 
                         print(f"Assigning Job {locked_job.id} (conv={locked_job.id_convenio}) "
                               f"to {server_url} {'(session match)' if session_match else ''}")

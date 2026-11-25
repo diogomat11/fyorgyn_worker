@@ -30,6 +30,7 @@ from core.selenium_helpers import (
     clicar_elemento,
     elemento_existe,
 )
+from core.exceptions import LoginFailedError
 
 if TYPE_CHECKING:
     from base_scraper import BaseScraper
@@ -46,7 +47,10 @@ def run(scraper: "BaseScraper", job_data: dict) -> list:
 
     if not usuario or not senha:
         scraper.log("Credenciais Bradesco não encontradas / não configuradas", level="ERROR", job_id=job_id)
-        raise ValueError("PermanentError: Credenciais Bradesco ausentes")
+        # Prefixo LOGIN_REJEITADO: é o mesmo contrato do contexto fature — o
+        # scraper (fatal por prefixo) e o breaker do dispatcher (
+        # error_message LIKE 'LOGIN_REJEITADO%') reconhecem e NÃO retentam.
+        raise LoginFailedError("LOGIN_REJEITADO: Credenciais Bradesco ausentes (configure no frontend)")
 
     driver = scraper.driver
 
@@ -117,8 +121,10 @@ def run(scraper: "BaseScraper", job_data: dict) -> list:
         for xpath in error_indicators:
             if elemento_existe(driver, By.XPATH, xpath, timeout=2):
                 error_text = driver.find_element(By.XPATH, xpath).text
-                raise ValueError(f"PermanentError: Login falhou — {error_text}")
-    except ValueError:
+                # Login rejeitado pelo Polimed — FATAL (sem retry): mesma
+                # mensagem do contexto fature, reconhecida pelo scraper e breaker.
+                raise LoginFailedError(f"LOGIN_REJEITADO: {error_text}")
+    except LoginFailedError:
         raise
     except Exception:
         pass  # Sem erro detectado — login OK

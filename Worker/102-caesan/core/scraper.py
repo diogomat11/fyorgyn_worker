@@ -153,19 +153,38 @@ class CaesanScraper(BaseScraper):
         # quando o processo serviu outro convênio antes (cross-talk real:
         # "cannot import name 'X_LOGIN_BOTAO_ACESAR' from ... 6-ipasgo").
         # Módulos da raiz do Worker (base_scraper/models/...) ficam de fora.
+        #
+        # Incidente 2026-11-11 (jobs CAESAN 23711/23667): pacotes NAMESPACE
+        # (sem __init__.py, ex.: config/ de 102-caesan e 6-ipasgo) têm
+        # __file__=None e sobreviviam a esta purga — o 'config' namespace
+        # envenenado (com atributo settings apontando p/ o settings.py do
+        # outro integrador) persistia entre jobs e `from config import
+        # settings` no op0 levava o Chrome ao PORTAL ERRADO. A purga agora
+        # também examina cada entrada de __path__ de pacotes sem __file__.
+        # Com __init__.py nos dois config/, novos imports já nascem regulares.
         for key in list(sys.modules):
             mod = sys.modules.get(key)
-            mod_file = getattr(mod, "__file__", None)
-            if not mod_file:
+            if mod is None:
                 continue
-            mod_abs = os.path.abspath(mod_file)
-            # dentro de Worker\<dígitos>-...\ ?
-            partes = mod_abs.lower().split(os.sep)
-            try:
-                idx = next(i for i, p in enumerate(partes) if p == "worker" and i + 1 < len(partes) and partes[i + 1][0].isdigit())
-            except StopIteration:
+            caminhos = []
+            if getattr(mod, "__file__", None):
+                caminhos.append(os.path.abspath(mod.__file__))
+            for pth in getattr(mod, "__path__", None) or []:
+                try:
+                    caminhos.append(os.path.abspath(pth))
+                except Exception:
+                    continue
+            if not caminhos:
                 continue
-            del sys.modules[key]
+            for mod_abs in caminhos:
+                # dentro de Worker\<dígitos>-...\ ?
+                partes = mod_abs.lower().split(os.sep)
+                try:
+                    idx = next(i for i, p in enumerate(partes) if p == "worker" and i + 1 < len(partes) and partes[i + 1][0].isdigit())
+                except StopIteration:
+                    continue
+                del sys.modules[key]
+                break
 
         spec = importlib.util.spec_from_file_location(op_name, op_path)
         module = importlib.util.module_from_spec(spec)

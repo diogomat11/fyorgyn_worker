@@ -170,9 +170,21 @@ X_AUTFACPLAN_BTN_FECHAR_DIALOG = '/html/body/div[8]/div[1]/button'
 
 
 # ===========================
+# OP20 - VALIDAR CODIGO BENEFICIARIO (Selectize em LocalizarProcedimentos)
+# ===========================
+CSS_BENEF_HIDDEN_INPUT = "beneficiario input.inputSelectize.selectized"
+CSS_BENEF_ITEM_SELECTED = "beneficiario .selectize-input .itemSelected"
+CSS_BENEF_REMOVE_BTN = "beneficiario .selectize-input .itemSelected a.remove, beneficiario .selectize-input a"
+CSS_BENEF_TEXT_INPUT = "beneficiario .selectize-input input[type='text'], beneficiario .selectize-input input"
+CSS_BENEF_DROPDOWN_OPTIONS = "beneficiario .selectize-dropdown .selectize-dropdown-content .option, .selectize-dropdown .selectize-dropdown-content .option"
+X_REMOVE_CARTEIRA_BENEF = "/html/body/main/div[2]/div[1]/div[2]/div[1]/div[2]/beneficiario/div/div/div/div/div/div/div/a"
+
+
+# ===========================
 # TIMEOUTS / CONFIG
 # ===========================
 DEFAULT_TIMEOUT = 20
 LONG_TIMEOUT = 45
 SHORT_TIMEOUT = 5
+
 

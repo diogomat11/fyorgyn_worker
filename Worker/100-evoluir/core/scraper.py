@@ -135,6 +135,25 @@ class EvoluirScraper(BaseScraper):
         if not os.path.exists(op_path):
             raise FileNotFoundError(f"Operação {op_name} não encontrada em {op_path}")
 
+        # Cross-talk entre integradores: job anterior de OUTRO convênio no mesmo
+        # processo deixa 'config' (e módulos dele) cacheado em sys.modules — o
+        # import da OP resolveria o pacote errado (ex.: config do 102-caesan
+        # servindo o 6-ipasgo → ImportError em X_LOGIN_USERNAME). Purga módulos
+        # de QUALQUER Worker/<id>-* antes de carregar a OP (a OP é recarregada
+        # do disco; módulos da raiz do Worker ficam de fora).
+        for _key in list(sys.modules):
+            _mod = sys.modules.get(_key)
+            _f = getattr(_mod, "__file__", None)
+            if not _f:
+                continue
+            _parts = os.path.abspath(_f).lower().split(os.sep)
+            try:
+                _i = next(i for i, p in enumerate(_parts)
+                          if p == "worker" and i + 1 < len(_parts) and _parts[i + 1][0].isdigit())
+            except StopIteration:
+                continue
+            del sys.modules[_key]
+
         spec = importlib.util.spec_from_file_location(op_name, op_path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)

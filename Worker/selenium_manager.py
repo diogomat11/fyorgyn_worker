@@ -1,3 +1,7 @@
+import os
+import re
+import shutil
+import sys
 import threading
 import time
 from datetime import datetime, timedelta
@@ -56,13 +60,23 @@ class SeleniumManager:
 
             # 3. Create new driver
             print(f">>> Creating new driver for convenio {id_convenio} (user_id={user_id})...")
-            driver = self._create_new_driver(headless)
+            driver = self._create_new_driver(headless, id_convenio=id_convenio)
             driver.current_user_id = user_id
             self.drivers[key] = driver
             self.last_activity[key] = datetime.now()
             return driver
 
-    def _create_new_driver(self, headless):
+    def _create_new_driver(self, headless, id_convenio=None):
+        # Bradesco (convênio 1): o portal bloqueou o usuário repetidamente e há
+        # suspeita de detecção de automação — usa UNDETECTED-chromedriver
+        # (patcha os artefatos do chromedriver: navigator.webdriver, cdc_ etc.).
+        # AMIL (convênio 9): credenciado.amil.com.br roda Akamai bot-manager
+        # (cookies _abck/bm_sz) que detecta o chromedriver padrão — também
+        # precisa de UC (decisão D8 do plano_amil_op0_op1).
+        # Demais convênios seguem com chromedriver padrão.
+        if id_convenio in (1, 9):
+            return self._create_undetected_driver(headless)
+
         chrome_options = Options()
         chrome_options.add_argument("--disable-blink-features=AutomationControlled")
         chrome_options.add_argument("--no-sandbox")
@@ -72,7 +86,7 @@ class SeleniumManager:
         chrome_options.add_argument("--disable-features=PasswordLeakDetection")
         chrome_options.add_argument("--incognito")  # Impede balões nativos de "Salvar Senha" ou "Senha Vazada"
         chrome_options.add_argument("--remote-allow-origins=*")
-        
+
         # Desativar prompts de salvar senha do navegador
         prefs = {
             "credentials_enable_service": False,
@@ -81,7 +95,7 @@ class SeleniumManager:
         chrome_options.add_experimental_option("prefs", prefs)
         if headless:
             chrome_options.add_argument("--headless=new")
-        
+
         max_attempts = 3
         last_err = None
         for attempt in range(1, max_attempts + 1):
@@ -92,6 +106,111 @@ class SeleniumManager:
             except Exception as e:
                 last_err = e
                 print(f">>> Erro na tentativa {attempt}/{max_attempts} ao criar Chrome Driver: {e}")
+                time.sleep(1)
+        raise last_err
+
+    @staticmethod
+    def _chrome_version_main():
+        """Versão MAJOR do Chrome instalado (ex. 157 de '157.0.8103.79').
+        Windows: registro BLBeacon; POSIX: `--version` do binário.
+        None = deixa o uc detectar sozinho."""
+        try:
+            if sys.platform == "win32":
+                import winreg
+                for root in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+                    try:
+                        with winreg.OpenKey(root, r"Software\Google\Chrome\BLBeacon") as k:
+                            ver, _ = winreg.QueryValueEx(k, "version")
+                            m = re.match(r"(\d+)\.", str(ver))
+                            if m:
+                                return int(m.group(1))
+                    except OSError:
+                        continue
+            else:
+                import subprocess
+                for cmd in ("google-chrome", "google-chrome-stable", "chromium",
+                            "chromium-browser"):
+                    try:
+                        out = subprocess.run([cmd, "--version"], capture_output=True,
+                                             text=True, timeout=10).stdout
+                        m = re.search(r"(\d+)\.", out)
+                        if m:
+                            return int(m.group(1))
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+        return None
+
+    @staticmethod
+    def _expurgar_cache_uc():
+        """Remove o driver patchado em cache do undetected-chromedriver
+        (~/appdata/roaming/undetected_chromedriver) para forçar re-download
+        da major compatível com o Chrome instalado."""
+        cache = os.path.join(os.path.expanduser("~"), "appdata", "roaming",
+                             "undetected_chromedriver")
+        if os.path.isdir(cache):
+            shutil.rmtree(cache, ignore_errors=True)
+            print(f">>> Cache do UC expurgado ({cache}) — driver será re-baixado")
+
+    def _create_undetected_driver(self, headless):
+        """Driver furtivo (undetected-chromedriver) para portais com detecção
+        de automação (Bradesco/Orizon, AMIL/Akamai). Mantém os mesmos anti-balões."""
+        import undetected_chromedriver as uc
+
+        # FIX mismatch de major (ChromeDriver 158 vs Chrome 157): o driver
+        # patchado em cache pode ter sido baixado para outra versão do Chrome
+        # (auto-update/reversão) e o uc reusa sem re-checar. Detecta a major
+        # instalada e fixa version_main — e, se mesmo assim vier mismatch na
+        # tentativa, expurga o cache antes de re-tentar.
+        version_main = self._chrome_version_main()
+        if version_main:
+            print(f">>> Chrome instalado: versão {version_main} (version_main fixado no UC)")
+
+        max_attempts = 3
+        last_err = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                options = uc.ChromeOptions()
+                options.add_argument("--no-sandbox")
+                options.add_argument("--disable-gpu")
+                options.add_argument("--disable-dev-shm-usage")
+                options.add_argument("--kiosk-printing")
+                options.add_argument("--disable-features=PasswordLeakDetection")
+                # uc gerencia AutomationControlled sozinho (patcha o binário)
+                prefs = {
+                    "credentials_enable_service": False,
+                    "profile.password_manager_enabled": False,
+                }
+                options.add_experimental_option("prefs", prefs)
+                if headless:
+                    # uc aceita --headless=new; headful é mais furtivo — se o
+                    # portal voltar a bloquear, rodar com SGUCARD_HEADLESS=false
+                    options.add_argument("--headless=new")
+                    # FIX Akamai (incidente AMIL 2026-11-20): o UA do headless
+                    # vaza 'HeadlessChrome' e o bot-manager reprova na edge
+                    # (403 'Acesso Negado' antes mesmo do form de login).
+                    # Override para o UA real equivalente da mesma major.
+                    plataforma = "Windows NT 10.0; Win64; x64" if sys.platform == "win32" else "X11; Linux x86_64"
+                    ver = version_main or 130
+                    ua = (f"Mozilla/5.0 ({plataforma}) AppleWebKit/537.36 "
+                          f"(KHTML, like Gecko) Chrome/{ver}.0.0.0 Safari/537.36")
+                    options.add_argument(f"--user-agent={ua}")
+                    print(f">>> UC headless com UA real (Akamai): Chrome/{ver}")
+                kwargs = {"options": options, "use_subprocess": True}
+                if version_main:
+                    kwargs["version_main"] = version_main
+                driver = uc.Chrome(**kwargs)
+                driver.maximize_window()
+                return driver
+            except Exception as e:
+                last_err = e
+                print(f">>> Erro na tentativa {attempt}/{max_attempts} ao criar Chrome UNDETECTED: {e}")
+                # Mismatch de versão → cache do driver patchado está errado;
+                # expurga para o re-download casar com o Chrome instalado
+                msg = str(e)
+                if "only supports Chrome version" in msg or "SessionNotCreated" in msg:
+                    self._expurgar_cache_uc()
                 time.sleep(1)
         raise last_err
 

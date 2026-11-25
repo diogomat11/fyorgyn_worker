@@ -15,11 +15,22 @@ _module_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _module_root not in sys.path:
     sys.path.insert(0, _module_root)
 
+# Cross-talk SEQUENCIAL entre convênios no MESMO processo server (job_lock
+# serializa jobs, mas o scraper do convênio anterior — ex. 6-ipasgo — deixa
+# sys.modules['core'] apontando para o pacote DELE; o import top-level abaixo
+# resolveria o pacote errado → "No module named 'core.exceptions'"). Este
+# import roda ANTES do purge do execute_op, então purga aqui (incidentes
+# 26219-26224 / 26219 canário 14/11).
+for _k in [k for k in list(sys.modules)
+           if k in ("core", "config") or k.startswith("core.") or k.startswith("config.")]:
+    del sys.modules[_k]
+
 from base_scraper import BaseScraper
+from op_load_lock import op_load_lock
 from models import Convenio, JobExecution, UserConvenio
 from security_utils import decrypt_password
 from database import SessionLocal
-from core.exceptions import MfaError, SessionExpiredError
+from core.exceptions import LoginFailedError, MfaError, SessionExpiredError
 
 
 class BradescoScraper(BaseScraper):
@@ -37,7 +48,18 @@ class BradescoScraper(BaseScraper):
         self.cod_prestador = None
         self.module_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 1-bradesco root
 
-    def _extract_credentials_from_dict(self, data_dict):
+    def _extract_credentials_from_dict(self, data_dict, contexto="autorize"):
+        """Resolve credenciais dos PARAMS do job (arquitetura params-first).
+
+        SEGREGAÇÃO POR CONTEXTO (incidente: senha do Autorize digitada no
+        Faturi → conta bloqueada): os portais Autorize (Polimed) e Fature
+        (Orizon/Faturi) têm credenciais DISTINTAS —
+          autorize → login / senha_criptografada
+          fature   → login_fat / senha_fat_criptografada
+        SEM fallback silencioso entre os pares (era o bug raiz).
+        Senhas CRIPTOGRAFADAS têm prioridade sobre plaintext (params de OP19
+        carregam 'senha' = senha da GUIA, não do portal).
+        """
         if not data_dict or not isinstance(data_dict, dict):
             return False
 
@@ -53,18 +75,39 @@ class BradescoScraper(BaseScraper):
         if isinstance(params, dict):
             merged.update(params)
 
-        login_val = merged.get("login") or merged.get("username") or merged.get("usuario")
-        if login_val:
-            self.username = str(login_val).strip()
+        if contexto == "fature":
+            login_val = merged.get("login_fat")
+            pwd_raw = None
+            if merged.get("senha_fat_criptografada"):
+                try:
+                    pwd_raw = decrypt_password(merged.get("senha_fat_criptografada"))
+                except Exception:
+                    pwd_raw = None
+            if not pwd_raw and merged.get("senha_fat"):
+                pwd_raw = merged.get("senha_fat")
+        else:
+            login_val = merged.get("login") or merged.get("username") or merged.get("usuario")
+            pwd_raw = None
+            if merged.get("senha_criptografada"):
+                try:
+                    pwd_raw = decrypt_password(merged.get("senha_criptografada"))
+                except Exception:
+                    pwd_raw = None
+            if not pwd_raw:
+                # Fallback plaintext só na ausência de versão criptografada
+                pwd_raw = merged.get("password") or merged.get("senha")
 
-        pwd_raw = merged.get("password") or merged.get("senha")
-        if not pwd_raw and merged.get("senha_criptografada"):
-            try:
-                pwd_raw = decrypt_password(merged.get("senha_criptografada"))
-            except Exception:
-                pass
-        if pwd_raw:
-            self.password = str(pwd_raw).strip()
+        login_val = str(login_val).strip() if login_val else None
+        pwd_val = str(pwd_raw).strip() if pwd_raw else None
+        # VALIDAÇÃO LOCAL POR CONTEXTO: só atribui quando o par DO CONTEXTO
+        # existe. Antes, username/password podiam ser HERANÇA de um load
+        # anterior (server.reload_credentials com contexto autorize) → o login
+        # do Faturi recebia a senha do Autorize → "inválidos" (incidente canário
+        # 14/11: manual OK, automatizado rejeitado).
+        if not (login_val and pwd_val):
+            return False
+        self.username = login_val
+        self.password = pwd_val
 
         prest_val = (
             merged.get("cod_prestador") or
@@ -74,34 +117,50 @@ class BradescoScraper(BaseScraper):
         if prest_val:
             self.cod_prestador = str(prest_val).strip()
 
-        return bool(self.username and self.password)
+        return True
 
-    def _load_credentials(self, job_data=None):
+    def _load_credentials(self, job_data=None, contexto="autorize"):
         """
-        Busca credenciais via job_data ou na user_convenios (por user_id + id_convenio).
+        Credenciais via PARAMS do job (params-first); user_convenios apenas
+        como último recurso — com as colunas DO CONTEXTO (fature lê
+        login_fat/senha_fat_criptografada, autorize lê login/senha_criptografada).
         """
         try:
-            if job_data and self._extract_credentials_from_dict(job_data):
-                self.log(f"Credenciais carregadas via job_data (user_id={self.user_id}, prestador={self.cod_prestador})")
-                return
+            if job_data and self._extract_credentials_from_dict(job_data, contexto):
+                self.log(f"Credenciais ({contexto}) carregadas via job_data (user_id={self.user_id}, prestador={self.cod_prestador}, login={self.username})")
+                return True
 
             if self.user_id and self.db:
                 user_conv = self.db.query(UserConvenio).filter(
                     UserConvenio.user_id == self.user_id,
                     UserConvenio.id_convenio == self.id_convenio
                 ).first()
-                if user_conv and user_conv.login and user_conv.senha_criptografada:
-                    self.username = user_conv.login
-                    self.password = decrypt_password(user_conv.senha_criptografada)
-                    self.cod_prestador = user_conv.cod_prestador
-                    self.log(f"Credenciais carregadas de user_convenios (user_id={self.user_id}, prestador={self.cod_prestador})")
-                    return
-                else:
-                    self.log(
-                        f"Registro user_convenios incompleto para user_id={self.user_id} e convenio={self.id_convenio}. "
-                        f"Login={getattr(user_conv, 'login', 'N/A') if user_conv else 'NOT FOUND'}",
-                        level="INFO"
-                    )
+                if user_conv:
+                    if contexto == "fature":
+                        # SEM fallback para credenciais do Autorize (bloqueou a conta)
+                        if user_conv.login_fat and user_conv.senha_fat_criptografada:
+                            self.username = user_conv.login_fat
+                            self.password = decrypt_password(user_conv.senha_fat_criptografada)
+                            self.cod_prestador = user_conv.cod_prestador
+                            self.log(f"Credenciais fature carregadas de user_convenios (user_id={self.user_id}, login_fat={self.username})")
+                            return True
+                        self.log(
+                            f"CREDENCIAIS FATURE AUSENTES (login_fat/senha_fat_criptografada vazios em user_convenios "
+                            f"user_id={self.user_id}). Configure no frontend (campo Senha (Fat)).",
+                            level="ERROR",
+                        )
+                        return False
+                    if user_conv.login and user_conv.senha_criptografada:
+                        self.username = user_conv.login
+                        self.password = decrypt_password(user_conv.senha_criptografada)
+                        self.cod_prestador = user_conv.cod_prestador
+                        self.log(f"Credenciais autorize carregadas de user_convenios (user_id={self.user_id}, prestador={self.cod_prestador})")
+                        return True
+                self.log(
+                    f"Registro user_convenios incompleto para user_id={self.user_id} e convenio={self.id_convenio}. "
+                    f"Login={getattr(user_conv, 'login', 'N/A') if user_conv else 'NOT FOUND'}",
+                    level="INFO"
+                )
             else:
                 self.log("user_id nao fornecido ao scraper — nao foi possivel carregar credenciais", level="INFO")
             self.log(
@@ -110,13 +169,14 @@ class BradescoScraper(BaseScraper):
             )
         except Exception as e:
             self.log(f"Bradesco Credential Load Error: {e}", level="ERROR")
+        return False
 
-    def reload_credentials(self, user_id, job_data=None):
+    def reload_credentials(self, user_id, job_data=None, contexto="autorize"):
         self.user_id = user_id
         self.username = None
         self.password = None
         self.cod_prestador = None
-        self._load_credentials(job_data)
+        self._load_credentials(job_data, contexto)
 
     def start_driver(self):
         pass  # Managed by SeleniumManager
@@ -184,9 +244,33 @@ class BradescoScraper(BaseScraper):
         if not os.path.exists(op_path):
             raise FileNotFoundError(f"Operação {op_name} não encontrada em {op_path}")
 
-        spec = importlib.util.spec_from_file_location(op_name, op_path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
+        # Cross-talk entre integradores: job anterior de OUTRO convênio no mesmo
+        # processo deixa 'config' (e módulos dele) cacheado em sys.modules — o
+        # import da OP resolveria o pacote errado (ex.: config do 102-caesan
+        # servindo o 6-ipasgo → ImportError em X_LOGIN_USERNAME). Purga módulos
+        # de QUALQUER Worker/<id>-* antes de carregar a OP (a OP é recarregada
+        # do disco; módulos da raiz do Worker ficam de fora).
+        # Lock global (incidente 26219-26224): purge + exec_module são região
+        # crítica — sem o lock, dois convênios carregando OPs concorrentemente
+        # fazem 'core'/'config' resolverem para o pacote errado (sys.path[0]
+        # do outro) → ModuleNotFoundError: core.exceptions.
+        with op_load_lock:
+            for _key in list(sys.modules):
+                _mod = sys.modules.get(_key)
+                _f = getattr(_mod, "__file__", None)
+                if not _f:
+                    continue
+                _parts = os.path.abspath(_f).lower().split(os.sep)
+                try:
+                    _i = next(i for i, p in enumerate(_parts)
+                              if p == "worker" and i + 1 < len(_parts) and _parts[i + 1][0].isdigit())
+                except StopIteration:
+                    continue
+                del sys.modules[_key]
+
+            spec = importlib.util.spec_from_file_location(op_name, op_path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
 
         func = getattr(module, "run", None) or getattr(module, "execute", None)
         if not func:
@@ -225,14 +309,23 @@ class BradescoScraper(BaseScraper):
                 except Exception as e:
                     self.log(f"Failed to parse job params: {e}", level="WARN", job_id=job_id)
 
-        # Prioritize credentials injected from dispatcher via params
-        injected_login = job_data.get("login") or job_data.get("users_convenio_login")
-        if injected_login:
-            self.username = injected_login
-            if job_data.get("senha_criptografada"):
-                from security_utils import decrypt_password
-                self.password = decrypt_password(job_data.get("senha_criptografada"))
-            self.log(f"Credenciais Bradesco aplicadas a partir dos parâmetros do Job (login={self.username})", job_id=job_id)
+        # Contexto PRIMEIRO (define qual par de credenciais usar e qual OP map)
+        contexto = job_data.get("contexto", "autorize")
+
+        # Credenciais SEGREGADAS por contexto, a partir dos PARAMS do job
+        # (params-first; user_convenios só como último recurso). Antes disto o
+        # login do Faturi recebia a senha do AUTORIZE → "Usuário e/ou senha
+        # inválidos" → retries → conta bloqueada (incidente 26219+).
+        if not self._load_credentials(job_data, contexto):
+            fat_msg = (
+                "FATURA_SEM_CREDENCIAIS: login_fat/senha_fat_criptografada ausentes nos params do job "
+                "e em user_convenios — configure no frontend (campo Senha (Fat)). Sem tentativa de login."
+                if contexto == "fature"
+                else "AUTORIZE_SEM_CREDENCIAIS: login/senha_criptografada ausentes — configure no frontend."
+            )
+            self.log(fat_msg, level="ERROR", job_id=job_id)
+            raise ValueError(fat_msg)
+        self.log(f"Credenciais {contexto} ativas (login={self.username})", job_id=job_id)
 
         # cod_prestador do JSON SEMPRE prevalece sobre o padrão do banco
         if job_data.get("cod_prestador"):
@@ -243,8 +336,6 @@ class BradescoScraper(BaseScraper):
         error_msg = None
         error_cat = "scraper_error"
         sessoes_expiradas = 0  # quedas consecutivas de sessão (escada: 2ª → reciclar driver)
-
-        contexto = job_data.get("contexto", "autorize")
         
         # Map routine strings to op names based on context
         if contexto == "fature":
@@ -268,11 +359,28 @@ class BradescoScraper(BaseScraper):
         for attempt in range(self.max_retries):
             try:
                 # Check session
+                # Incidente 26223: URL do pool sem "login" (casca do SPA em
+                # portal.orizon.com.br ou about:blank pós-limpeza de cookies)
+                # era tratada como sessão válida → op1 rodava sem op0_login e o
+                # fetch morria em CORS (HTTP 0 em ~5ms). Só dispensa login se a
+                # URL estiver NA ÁREA AUTENTICADA do portal (allowlist positiva).
                 need_login = attempt > 0
                 if not need_login:
                     try:
                         url = self.driver.current_url if self.driver else "data:,"
-                        if url.startswith("data:") or "login" in url.lower():
+                        url_l = url.lower()
+                        # Allowlist positiva E CONTEXTO-AWARE: o login do Autorize
+                        # (Polimed) é diferente do Fature (Orizon/Keycloak). Um
+                        # driver deixado no Autorize NÃO tem sessão válida para
+                        # um job do Fature (e vice-versa) — cada contexto só
+                        # dispensa login na SUA área autenticada.
+                        if contexto == "fature":
+                            autenticado = url_l.startswith("https://portal.orizon.com.br/fature/")
+                        else:
+                            autenticado = url_l.startswith("https://www.polimed.com.br/autorize/")
+                        if "login" in url_l or "/acesso-restrito" in url_l:
+                            autenticado = False
+                        if not autenticado:
                             need_login = True
                         elif self.driver:
                             # Strict check: did the driver previously log in with a different user?
@@ -323,6 +431,16 @@ class BradescoScraper(BaseScraper):
                 self.log(f"Attempt {attempt + 1} failed (MFA — sem retry): {error_msg}", level="ERROR", job_id=job_id)
                 execution.status = "error"
                 break
+            except LoginFailedError as e:
+                # Portal REJEITOU as credenciais (mensagem da página incluída) —
+                # retry com a mesma senha multiplica tentativas erradas e pode
+                # BLOQUEAR a conta (incidente: usuário bloqueado). Fatal: o
+                # usuário corrige a senha no frontend e os próximos jobs pegam
+                # a nova de user_convenios.
+                error_msg = str(e)
+                self.log(f"Attempt {attempt + 1} failed (LOGIN REJEITADO — sem retry): {error_msg}", level="ERROR", job_id=job_id)
+                execution.status = "error"
+                break
             except SessionExpiredError as e:
                 # Escada de recuperação (FASE C): 1ª queda → re-login no mesmo driver
                 # (attempt seguinte já força need_login); 2ª consecutiva → reciclar o
@@ -342,6 +460,18 @@ class BradescoScraper(BaseScraper):
                     execution.status = "error"
             except Exception as e:
                 error_msg = str(e)
+                # FATAL POR PREFIXO (imune à purga de sys.modules: factory.py
+                # re-executa este módulo por job e execute_op purga core.exceptions
+                # — a OP levanta uma classe LoginFailedError DIFERENTE da testada
+                # pelo except acima, isinstance falha e o erro caía aqui como
+                # genérico → 3 tentativas → conta bloqueada). Prefixo é estável.
+                if (error_msg.startswith("LOGIN_REJEITADO:")
+                        or error_msg.startswith("FATURA_SEM_CREDENCIAIS")
+                        or error_msg.startswith("AUTORIZE_SEM_CREDENCIAIS")
+                        or "PermanentError:" in error_msg):
+                    self.log(f"Attempt {attempt + 1} failed (LOGIN REJEITADO — sem retry): {error_msg}", level="ERROR", job_id=job_id)
+                    execution.status = "error"
+                    break
                 sessoes_expiradas = 0
                 self.log(f"Attempt {attempt + 1} failed: {error_msg}", level="ERROR", job_id=job_id)
                 if attempt < self.max_retries - 1:

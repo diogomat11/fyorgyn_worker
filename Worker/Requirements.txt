@@ -21,3 +21,4 @@ psutil
 pystray
 Pillow
 winotify
+undetected-chromedriver

@@ -63,9 +63,29 @@ def _load_op10_module():
     return module
 
 
-def bootstrap_conferencia_context(driver, scraper, job_id, protocolo):
+def bootstrap_conferencia_context(driver, scraper, job_id, protocolo, skip_if_same_protocolo=False):
     """Navega ao módulo ConferenciaFaturamento do protocolo e fecha notificações."""
-    driver.get(f"{CONFERENCIA_BASE_URL}?protocolo={protocolo}")
+    target_url = f"{CONFERENCIA_BASE_URL}?protocolo={protocolo}"
+    if skip_if_same_protocolo:
+        try:
+            cur_url = driver.current_url or ""
+            if "ConferenciaFaturamento" in cur_url and f"protocolo={protocolo}" in cur_url:
+                return
+        except Exception:
+            pass
+    try:
+        driver.set_page_load_timeout(25)
+    except Exception:
+        pass
+    try:
+        driver.get(target_url)
+    except Exception as e:
+        raise RuntimeError(f"Bloqueio ou timeout ao carregar ConferenciaFaturamento (protocolo {protocolo}): {e}")
+    finally:
+        try:
+            driver.set_page_load_timeout(120)
+        except Exception:
+            pass
     for _ in range(10):
         try:
             if driver.execute_script("return document.readyState;") == "complete":
@@ -99,7 +119,65 @@ def _extrair_total_paginas(response_json):
     return None
 
 
-def _normalizar_guia_item(guia, item, op11, op10):
+def _guia_tem_anexo_ativo(resposta_anexos) -> bool:
+    """Retorna True se ListarAnexosGuia trouxe ao menos 1 anexo não excluído."""
+    if not isinstance(resposta_anexos, dict):
+        return False
+    lista = resposta_anexos.get("Data")
+    if not isinstance(lista, list):
+        return False
+    return any(isinstance(a, dict) and not a.get("Excluido", False) for a in lista)
+
+
+def _consultar_anexos_por_guia(client, scraper, job_id, capa_lote_id, guias, op10) -> dict:
+    """
+    Para cada guia única da capa, verifica se possui anexo ativo via
+    GET /ConferenciaFaturamento/ListarAnexosGuia?capaLoteId={protocolo}&numeroGuiaOperadora={guia}.
+    Se o objeto da guia em ObterProcedimentos já trouxer `TemAnexo=True`, aproveita
+    sem precisar de request extra; caso contrário consulta o endpoint ListarAnexosGuia.
+    Retorna dict {guia_normalizada: bool}.
+    """
+    mapa = {}
+    guias_para_consultar = []
+    for g in guias:
+        guia_raw = g.get("NumeroGuiaOperadora")
+        guia_norm = op10._normalizar_guia(guia_raw)
+        if not guia_norm or guia_norm in mapa:
+            continue
+        if g.get("TemAnexo") is True:
+            mapa[guia_norm] = True
+        else:
+            mapa[guia_norm] = False
+            guias_para_consultar.append((guia_norm, str(guia_raw or guia_norm).strip()))
+
+    if guias_para_consultar:
+        scraper.log(
+            f"OP17 - Verificando anexos (ListarAnexosGuia) de {len(guias_para_consultar)} guia(s)...",
+            job_id=job_id,
+        )
+        for idx, (guia_norm, guia_query) in enumerate(guias_para_consultar, 1):
+            try:
+                resp_anx = client.get_listar_anexos_guia(capa_lote_id, guia_query)
+                if _guia_tem_anexo_ativo(resp_anx):
+                    mapa[guia_norm] = True
+            except Exception as e:
+                scraper.log(
+                    f"OP17 - Aviso ao consultar anexos da guia {guia_norm}: {e}",
+                    level="WARN",
+                    job_id=job_id,
+                )
+            if idx % 20 == 0:
+                time.sleep(0.2)
+
+    com_anexo = sum(1 for v in mapa.values() if v)
+    scraper.log(
+        f"OP17 - Anexos verificados: {com_anexo} de {len(mapa)} guia(s) possuem anexo ativo.",
+        job_id=job_id,
+    )
+    return mapa
+
+
+def _normalizar_guia_item(guia, item, op11, op10, anexos_por_guia=None):
     """1 linha normalizada por item (dados da guia embutidos)."""
     op11_date = op11._parse_aspnet_date
 
@@ -109,13 +187,20 @@ def _normalizar_guia_item(guia, item, op11, op10):
     if data_procedimento is None:
         status_letra = STATUS_INAPTO
 
+    guia_norm = op10._normalizar_guia(guia.get("NumeroGuiaOperadora"))
+    tem_anexo = bool(
+        (anexos_por_guia or {}).get(guia_norm)
+        or guia.get("TemAnexo") is True
+    )
+
     return {
         # guia
-        "guia": op10._normalizar_guia(guia.get("NumeroGuiaOperadora")),
+        "guia": guia_norm,
         "guia_prestador_faturamento": str(guia.get("NumeroGuiaPrestadorFaturamento") or ""),
         "nome_beneficiario": str(guia.get("NomeBeneficiario") or "").strip(),
         "codigo_beneficiario": str(guia.get("CodigoBeneficiario") or "").strip(),
         "senha": str(guia.get("Senha") or "").strip(),
+        "tem_anexo": tem_anexo,
         # item
         "detalheId": item.get("IdServico"),
         "id_detalhe": item.get("IdDetalhe"),
@@ -179,9 +264,8 @@ def run(scraper, job_data):
         job_id=job_id
     )
 
-    todas = [_normalizar_guia_item(g, i, op11, op10) for g in guias for i in (g.get("Itens") or [])]
-
-    # Paginação futura: se o portal fragmentar, itera as demais páginas
+    # Paginação futura: se o portal fragmentar, coleta todas as guias primeiro
+    todas_guias = list(guias)
     total_paginas = _extrair_total_paginas(response_json)
     if total_paginas:
         for pagina in range(2, total_paginas + 1):
@@ -190,10 +274,20 @@ def run(scraper, job_data):
             guias_pag = (resp_pag.get("Capa") or {}).get("Guias") or []
             if not guias_pag:
                 break
-            todas.extend(
-                _normalizar_guia_item(g, i, op11, op10) for g in guias_pag for i in (g.get("Itens") or [])
-            )
+            todas_guias.extend(guias_pag)
             time.sleep(0.3)
+
+    # 3. Consulta ListarAnexosGuia por guia única do lote
+    capa_id_query = capa.get("CapaLoteId") or protocolo
+    anexos_por_guia = _consultar_anexos_por_guia(
+        client, scraper, job_id, capa_id_query, todas_guias, op10
+    )
+
+    todas = [
+        _normalizar_guia_item(g, i, op11, op10, anexos_por_guia)
+        for g in todas_guias
+        for i in (g.get("Itens") or [])
+    ]
 
     inaptos = sum(1 for i in todas if i["status_conferencia"] == STATUS_INAPTO)
     scraper.log(
